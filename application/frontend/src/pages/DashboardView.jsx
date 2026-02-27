@@ -1,348 +1,477 @@
 import "../styles/App.css";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar.jsx";
-import ButtonComponent from "../components/ButtonComponent.jsx";
+import DashboardTabs from "../components/DashboardTabs.jsx";
+import MediaSection from "../components/MediaSection.jsx";
 import { buildApiUrl } from "../lib/api.js";
-import { useEffect, useState } from "react";
-
-function decodeJwtPayload(token) {
-    try {
-        const [, payload] = token.split(".");
-        if (!payload) return null;
-        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-        const json = atob(normalized);
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
 
 function DashboardView() {
-    const [transactions, setTransactions] = useState([]);
+    const [activeView, setActiveView] = useState("movies");
+    const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [currentUserId, setCurrentUserId] = useState(null);
-    const [typeFilterOpen, setTypeFilterOpen] = useState(false);
-    const [typeFilter, setTypeFilter] = useState("all");
-    const [showForm, setShowForm] = useState(false);
-    const [creating, setCreating] = useState(false);
-    const [createError, setCreateError] = useState("");
-    const [form, setForm] = useState({
-        type: "income",
-        category: "",
-        amount: "",
-        description: "",
-        date: ""
-    });
+    const [addModalOpen, setAddModalOpen] = useState(false);
+    const [markModalOpen, setMarkModalOpen] = useState(false);
+    const [addContext, setAddContext] = useState({ type: "movies", section: "seen" });
+    const [markContext, setMarkContext] = useState({ id: null, title: "", media_type: "" });
+    const [formTitle, setFormTitle] = useState("");
+    const [formReason, setFormReason] = useState("");
+    const [formRating, setFormRating] = useState("");
+    const [markRating, setMarkRating] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [marking, setMarking] = useState(false);
+    const views = useMemo(
+        () => [
+            {
+                id: "movies",
+                label: "Películas",
+                sections: [
+                    {
+                        id: "seen-movies",
+                        title: "Películas Vistas",
+                        addLabel: "Agregar película",
+                        tables: [
+                            { title: "Me encantó", columns: ["Título", "Acciones"] },
+                            { title: "Me gustó", columns: ["Título", "Acciones"] },
+                            { title: "No me gustó", columns: ["Título", "Acciones"] }
+                        ]
+                    },
+                    {
+                        id: "watchlist-movies",
+                        title: "Películas por ver",
+                        addLabel: "Agregar película",
+                        tables: [
+                            { title: null, columns: ["Título", "Razón", "Acciones"] }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: "series",
+                label: "Series",
+                sections: [
+                    {
+                        id: "seen-series",
+                        title: "Series Vistas",
+                        addLabel: "Agregar serie",
+                        tables: [
+                            { title: "Me encantó", columns: ["Título", "Acciones"] },
+                            { title: "Me gustó", columns: ["Título", "Acciones"] },
+                            { title: "No me gustó", columns: ["Título", "Acciones"] }
+                        ]
+                    },
+                    {
+                        id: "watchlist-series",
+                        title: "Series por ver",
+                        addLabel: "Agregar serie",
+                        tables: [
+                            { title: null, columns: ["Título", "Razón", "Acciones"] }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: "games",
+                label: "Juegos",
+                sections: [
+                    {
+                        id: "seen-games",
+                        title: "Juegos Jugados",
+                        addLabel: "Agregar juego",
+                        tables: [
+                            { title: "Me encantó", columns: ["Título", "Acciones"] },
+                            { title: "Me gustó", columns: ["Título", "Acciones"] },
+                            { title: "No me gustó", columns: ["Título", "Acciones"] }
+                        ]
+                    },
+                    {
+                        id: "watchlist-games",
+                        title: "Juegos por jugar",
+                        addLabel: "Agregar juego",
+                        tables: [
+                            { title: null, columns: ["Título", "Razón", "Acciones"] }
+                        ]
+                    }
+                ]
+            }
+        ],
+        []
+    );
 
-    const fetchTransactions = async () => {
+    const activeContent = views.find((view) => view.id === activeView);
+    const typeMap = { movies: "movie", series: "series", games: "game" };
+
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem("token");
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    };
+
+    const loadItems = async () => {
         setError("");
         setLoading(true);
         try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(buildApiUrl("/api/transactions"), {
+            const response = await fetch(buildApiUrl("/api/media"), {
                 headers: {
-                    Authorization: token ? `Bearer ${token}` : ""
+                    "Content-Type": "application/json",
+                    ...getAuthHeaders()
                 }
             });
             const data = await response.json().catch(() => []);
             if (!response.ok) {
-                throw new Error(data?.error || data?.message || "Error al cargar transacciones");
+                throw new Error(data?.error || data?.message || "Error al cargar items");
             }
-            setTransactions(Array.isArray(data) ? data : []);
+            setItems(Array.isArray(data) ? data : []);
         } catch (err) {
-            setError(err?.message || "Error al cargar transacciones");
+            setError(err?.message || "Error al cargar items");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        const payload = token ? decodeJwtPayload(token) : null;
-        setCurrentUserId(payload?.userId ?? payload?.id ?? null);
-        fetchTransactions();
+        loadItems();
     }, []);
 
-    const handleDelete = async (txId) => {
-        if (!txId) return;
-        const confirmed = window.confirm("¿Eliminar esta transacción?");
-        if (!confirmed) return;
+    const openAddModal = (sectionId) => {
+        const section = sectionId.includes("watchlist") ? "watchlist" : "seen";
+        const type = sectionId.includes("movies")
+            ? "movies"
+            : sectionId.includes("series")
+                ? "series"
+                : "games";
+        setError("");
+        setAddContext({ type, section });
+        setFormTitle("");
+        setFormReason("");
+        setFormRating("");
+        setAddModalOpen(true);
+    };
 
+    const closeAddModal = () => {
+        setError("");
+        setAddModalOpen(false);
+    };
+
+    const handleCreate = async () => {
+        if (!formTitle.trim()) return;
+        if (addContext.section === "seen" && !formRating) {
+            setError("Selecciona una calificación");
+            return;
+        }
+        setSaving(true);
         setError("");
         try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(buildApiUrl(`/api/transactions/${txId}`), {
+            const payload = {
+                title: formTitle.trim(),
+                media_type: typeMap[addContext.type],
+                status: addContext.section === "watchlist" ? "watchlist" : "seen",
+                rating: addContext.section === "seen" ? formRating : null,
+                reason: addContext.section === "watchlist" ? formReason.trim() : null
+            };
+
+            const response = await fetch(buildApiUrl("/api/media"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data?.error || data?.message || "Error al guardar");
+            }
+            setAddModalOpen(false);
+            await loadItems();
+        } catch (err) {
+            setError(err?.message || "Error al guardar");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (row) => {
+        if (!row?.id) return;
+        const confirmed = window.confirm(`¿Eliminar "${row.title}"?`);
+        if (!confirmed) return;
+        setError("");
+        try {
+            const response = await fetch(buildApiUrl(`/api/media/${row.id}`), {
                 method: "DELETE",
                 headers: {
-                    Authorization: token ? `Bearer ${token}` : ""
+                    "Content-Type": "application/json",
+                    ...getAuthHeaders()
                 }
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(data?.error || data?.message || "Error al eliminar transacción");
+                throw new Error(data?.error || data?.message || "Error al eliminar");
             }
-
-            // Optimistic UI update
-            setTransactions((prev) => prev.filter((tx) => tx.id !== txId));
+            await loadItems();
         } catch (err) {
-            setError(err?.message || "Error al eliminar transacción");
+            setError(err?.message || "Error al eliminar");
         }
     };
 
-    const handleFormChange = (event) => {
-        const { name, value } = event.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+    const openMarkSeenModal = (row) => {
+        setError("");
+        setMarkContext({
+            id: row.id,
+            title: row.title,
+            media_type: row.media_type
+        });
+        setMarkRating("");
+        setMarkModalOpen(true);
     };
 
-    const handleCreate = async (event) => {
-        event.preventDefault();
-        setCreateError("");
-        setCreating(true);
+    const handleMarkSeen = async () => {
+        if (!markContext.id) return;
+        if (!markRating) {
+            setError("Selecciona una calificación");
+            return;
+        }
+        setMarking(true);
+        setError("");
         try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(buildApiUrl("/api/transactions"), {
-                method: "POST",
+            const response = await fetch(buildApiUrl(`/api/media/${markContext.id}`), {
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: token ? `Bearer ${token}` : ""
+                    ...getAuthHeaders()
                 },
-                body: JSON.stringify({
-                    type: form.type,
-                    category: form.category,
-                    amount: Number(form.amount),
-                    description: form.description,
-                    date: form.date
-                })
+                body: JSON.stringify({ status: "seen", rating: markRating })
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(data?.error || data?.message || "Error al crear transacción");
+                throw new Error(data?.error || data?.message || "Error al actualizar");
             }
-            setShowForm(false);
-            setForm({
-                type: "income",
-                category: "",
-                amount: "",
-                description: "",
-                date: ""
-            });
-            await fetchTransactions();
+            setMarkModalOpen(false);
+            await loadItems();
         } catch (err) {
-            setCreateError(err?.message || "Error al crear transacción");
+            setError(err?.message || "Error al actualizar");
         } finally {
-            setCreating(false);
+            setMarking(false);
         }
     };
 
-    const filteredTransactions =
-        typeFilter === "all"
-            ? transactions
-            : transactions.filter((tx) => tx.type === typeFilter);
+    const activeItems = items.filter((item) => {
+        const normalizedType =
+            item.media_type === "movie"
+                ? "movies"
+                : item.media_type === "series"
+                    ? "series"
+                    : "games";
+        return normalizedType === activeView;
+    });
+
+    const buildTablesForSection = (sectionId, sectionType) => {
+        const sectionItems =
+            sectionType === "watchlist"
+                ? activeItems.filter((item) => item.status === "watchlist")
+                : activeItems.filter((item) => item.status === "seen");
+
+        if (sectionType === "watchlist") {
+            return [
+                {
+                    title: null,
+                    columns: ["Título", "Razón", "Acciones"],
+                    rows: sectionItems.map((item) => ({
+                        id: item.id,
+                        title: item.title,
+                        reason: item.reason,
+                        media_type: item.media_type
+                    })),
+                    isWatchlist: true
+                }
+            ];
+        }
+
+        const buckets = [
+            { title: "Me encantó", rating: "loved" },
+            { title: "Me gustó", rating: "liked" },
+            { title: "No me gustó", rating: "disliked" }
+        ];
+
+        return buckets.map((bucket) => ({
+            title: bucket.title,
+            columns: ["Título", "Acciones"],
+            rows: sectionItems
+                .filter((item) => item.rating === bucket.rating)
+                .map((item) => ({
+                    id: item.id,
+                    title: item.title,
+                    media_type: item.media_type
+                })),
+            isWatchlist: false
+        }));
+    };
 
     return (
-        <div>
+        <div className="dashboard-shell">
             <Navbar />
-            <main className="page">
-                <div style={{ width: "100%" }}>
-                    <section className="action-section">
-                        <div className="action-bar">
-                            <ul className="action-bar-list" style={{ gap: "1.4em" }}>
-                                <li>
-                                    <span style={{ color: "white", marginRight: "8px" }}>
-                                        SORT<br />BY:
-                                    </span>
-                                </li>
-                                <li>
-                                    <ButtonComponent
-                                        className="sort-date-btn"
-                                        text="Date"
-                                        onClick={() => console.log("Ordenando por fecha")}
-                                    />
-                                </li>
-                                <li>
-                                    <div className="type-filter">
-                                        <ButtonComponent
-                                            className="sort-type-btn"
-                                            text={
-                                                typeFilter === "all"
-                                                    ? "Type"
-                                                    : `Type: ${typeFilter}`
-                                            }
-                                            onClick={() =>
-                                                setTypeFilterOpen((prev) => !prev)
-                                            }
-                                        />
-                                        {typeFilterOpen ? (
-                                            <div className="type-filter-menu">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTypeFilter("income");
-                                                        setTypeFilterOpen(false);
-                                                    }}
-                                                >
-                                                    income
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTypeFilter("expense");
-                                                        setTypeFilterOpen(false);
-                                                    }}
-                                                >
-                                                    expense
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTypeFilter("all");
-                                                        setTypeFilterOpen(false);
-                                                    }}
-                                                >
-                                                    all
-                                                </button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </li>
-                            </ul>
-                            <ButtonComponent
-                                className="add-btn"
-                                text="+"
-                                onClick={() => setShowForm(true)}
+            <main className="dashboard-page">
+                <header className="dashboard-hero">
+                    <h1>Gestor de Medios</h1>
+                    <DashboardTabs
+                        tabs={views}
+                        active={activeView}
+                        onChange={setActiveView}
+                    />
+                </header>
+                {error ? <div className="dashboard-error">{error}</div> : null}
+                {loading ? <div className="dashboard-loading">Cargando...</div> : null}
+                <section className="dashboard-body">
+                    {activeContent?.sections.map((section) => (
+                        <MediaSection
+                            key={section.id}
+                            {...section}
+                            tables={buildTablesForSection(section.id, section.id.includes("watchlist") ? "watchlist" : "seen")}
+                            onAddClick={openAddModal}
+                            onDelete={handleDelete}
+                            onMarkSeen={openMarkSeenModal}
+                        />
+                    ))}
+                </section>
+                {addModalOpen ? (
+                    <div className="dashboard-modal-backdrop" onClick={closeAddModal}>
+                        <div
+                            className="dashboard-modal"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <h2 className="dashboard-modal-title">
+                                {addContext.section === "watchlist"
+                                    ? `Agregar ${addContext.type === "movies" ? "Película" : addContext.type === "series" ? "Serie" : "Juego"} a por ver`
+                                    : `Agregar ${addContext.type === "movies" ? "Película" : addContext.type === "series" ? "Serie" : "Juego"} a vistas`}
+                            </h2>
+                            <input
+                                className="dashboard-input"
+                                placeholder="Nombre"
+                                value={formTitle}
+                                onChange={(event) => setFormTitle(event.target.value)}
                             />
+                            {addContext.section === "watchlist" ? (
+                                <input
+                                    className="dashboard-input"
+                                    placeholder="Razón por ver"
+                                    value={formReason}
+                                    onChange={(event) => setFormReason(event.target.value)}
+                                />
+                            ) : (
+                                <div className="dashboard-rating">
+                                    <p>Calificación:</p>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            name="rating"
+                                            value="loved"
+                                            checked={formRating === "loved"}
+                                            onChange={(event) => setFormRating(event.target.value)}
+                                        />
+                                        Me encantó
+                                    </label>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            name="rating"
+                                            value="liked"
+                                            checked={formRating === "liked"}
+                                            onChange={(event) => setFormRating(event.target.value)}
+                                        />
+                                        Me gustó
+                                    </label>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            name="rating"
+                                            value="disliked"
+                                            checked={formRating === "disliked"}
+                                            onChange={(event) => setFormRating(event.target.value)}
+                                        />
+                                        No me gustó
+                                    </label>
+                                </div>
+                            )}
+                            <div className="dashboard-modal-actions">
+                                <button type="button" className="modal-btn secondary" onClick={closeAddModal}>
+                                    Cancelar
+                                </button>
+                                <button type="button" className="modal-btn primary" onClick={handleCreate} disabled={saving}>
+                                    {saving ? "Agregando..." : "Agregar"}
+                                </button>
+                            </div>
                         </div>
-                    </section>
-                    <section className="dashboard-panel">
-                        <div className="dashboard-header">
-                            <span>Transactions</span>
-                            {loading ? <span className="muted">Cargando...</span> : null}
+                    </div>
+                ) : null}
+                {markModalOpen ? (
+                    <div
+                        className="dashboard-modal-backdrop"
+                        onClick={() => {
+                            setError("");
+                            setMarkModalOpen(false);
+                        }}
+                    >
+                        <div
+                            className="dashboard-modal"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <h2 className="dashboard-modal-title">Marcar como visto</h2>
+                            <p className="dashboard-modal-subtitle">{markContext.title}</p>
+                            <div className="dashboard-rating">
+                                <p>Calificación:</p>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="mark-rating"
+                                        value="loved"
+                                        checked={markRating === "loved"}
+                                        onChange={(event) => setMarkRating(event.target.value)}
+                                    />
+                                    Me encantó
+                                </label>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="mark-rating"
+                                        value="liked"
+                                        checked={markRating === "liked"}
+                                        onChange={(event) => setMarkRating(event.target.value)}
+                                    />
+                                    Me gustó
+                                </label>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="mark-rating"
+                                        value="disliked"
+                                        checked={markRating === "disliked"}
+                                        onChange={(event) => setMarkRating(event.target.value)}
+                                    />
+                                    No me gustó
+                                </label>
+                            </div>
+                            <div className="dashboard-modal-actions">
+                                <button
+                                    type="button"
+                                    className="modal-btn secondary"
+                                    onClick={() => {
+                                        setError("");
+                                        setMarkModalOpen(false);
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    className="modal-btn primary"
+                                    onClick={handleMarkSeen}
+                                    disabled={marking}
+                                >
+                                    {marking ? "Marcando..." : "Marcar"}
+                                </button>
+                            </div>
                         </div>
-                        {error ? <div className="dashboard-error">{error}</div> : null}
-                        <div className="table-wrap">
-                            <table className="transactions-table">
-                                <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Category</th>
-                                    <th>Amount</th>
-                                    <th>Description</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {filteredTransactions.length === 0 && !loading ? (
-                                    <tr>
-                                        <td colSpan="6" className="empty-row">
-                                            No transactions yet.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredTransactions.map((tx) => (
-                                        <tr key={tx.id}>
-                                            <td>
-                                                {tx.date
-                                                    ? new Date(tx.date).toLocaleDateString()
-                                                    : "-"}
-                                            </td>
-                                            <td>{tx.type || "-"}</td>
-                                            <td>{tx.category || "-"}</td>
-                                            <td>{tx.amount ?? "-"}</td>
-                                            <td>{tx.description || "-"}</td>
-                                            <td>
-                                                {currentUserId != null && Number(tx.user_id) === Number(currentUserId) ? (
-                                                    <button
-                                                        type="button"
-                                                        className="tx-delete-btn"
-                                                        onClick={() => handleDelete(tx.id)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                ) : null}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    {showForm ? (
-                        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-                            <form
-                                className="modal-card"
-                                onSubmit={handleCreate}
-                                onClick={(event) => event.stopPropagation()}
-                            >
-                                <h2>Nueva transacción</h2>
-                                <div className="modal-row">
-                                    <label>Type</label>
-                                    <select name="type" value={form.type} onChange={handleFormChange}>
-                                        <option value="income">income</option>
-                                        <option value="expense">expense</option>
-                                    </select>
-                                </div>
-                                <div className="modal-row">
-                                    <label>Category</label>
-                                    <input
-                                        name="category"
-                                        value={form.category}
-                                        onChange={handleFormChange}
-                                        placeholder="categoria"
-                                        required
-                                    />
-                                </div>
-                                <div className="modal-row">
-                                    <label>Amount</label>
-                                    <input
-                                        name="amount"
-                                        type="number"
-                                        step="0.01"
-                                        value={form.amount}
-                                        onChange={handleFormChange}
-                                        placeholder="0.00"
-                                        required
-                                    />
-                                </div>
-                                <div className="modal-row">
-                                    <label>Description</label>
-                                    <input
-                                        name="description"
-                                        value={form.description}
-                                        onChange={handleFormChange}
-                                        placeholder="descripcion"
-                                    />
-                                </div>
-                                <div className="modal-row">
-                                    <label>Date</label>
-                                    <input
-                                        name="date"
-                                        type="date"
-                                        value={form.date}
-                                        onChange={handleFormChange}
-                                        required
-                                    />
-                                </div>
-                                {createError ? (
-                                    <div className="dashboard-error">{createError}</div>
-                                ) : null}
-                                <div className="modal-actions">
-                                    <ButtonComponent
-                                        text="Cancelar"
-                                        onClick={() => setShowForm(false)}
-                                        type="button"
-                                        style={{ backgroundColor: "#4a4a4a" }}
-                                    />
-                                    <ButtonComponent
-                                        text={creating ? "Guardando..." : "Guardar"}
-                                        type="submit"
-                                    />
-                                </div>
-                            </form>
-                        </div>
-                    ) : null}
-                </div>
+                    </div>
+                ) : null}
             </main>
         </div>
     );
