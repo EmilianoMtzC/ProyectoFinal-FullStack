@@ -18,11 +18,12 @@ const mediaTypeIdToName = {
     3: 'game'
 };
 
+// Helper to get user ID from request (from JWT) or fall back to default
+function getUserId(req) {
+    return req.user ? req.user.id : DEFAULT_USER_ID;
+}
+
 const mediaController = {
-    // Helper to get user ID from request (from JWT) or fall back to default
-    getUserId(req) {
-        return req.user ? req.user.id : DEFAULT_USER_ID;
-    },
 
     async create(req, res) {
         try {
@@ -45,7 +46,7 @@ const mediaController = {
             const itemStatus = status || 'watchlist';
 
             const mediaItem = await MediaItem.create({
-                user_id: this.getUserId(req),
+                user_id: getUserId(req),
                 title,
                 media_type_id: normalizedMediaType,
                 status: itemStatus,
@@ -86,7 +87,7 @@ const mediaController = {
                 }
             }
 
-            const items = await MediaItem.findByUser(this.getUserId(req), options);
+            const items = await MediaItem.findByUser(getUserId(req), options);
 
             // Map media_type_id back to string for frontend
             const mappedItems = items.map(item => ({
@@ -165,7 +166,7 @@ const mediaController = {
         try {
             const { id } = req.params;
 
-            const success = await MediaItem.delete(id, this.getUserId(req));
+            const success = await MediaItem.delete(id, getUserId(req));
             
             if (!success) {
                 return res.status(404).json({ error: 'Media item not found' });
