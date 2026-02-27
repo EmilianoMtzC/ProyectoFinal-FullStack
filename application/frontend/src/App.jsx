@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import DashboardView from "./pages/DashboardView.jsx";
+import AdminDashboard from "./pages/AdminDashboard.jsx";
 
 function App() {
     return (
@@ -12,6 +13,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/dashboard" element={<DashboardView />} />
+                <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
         </BrowserRouter>
     );

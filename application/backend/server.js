@@ -12,6 +12,7 @@ const path = require('path');
 // Import routes
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const authRoutes = require('./src/routes/authRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 
 // Initialize Express app
 const app = express();
@@ -28,6 +29,7 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

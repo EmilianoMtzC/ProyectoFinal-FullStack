@@ -5,7 +5,7 @@ import DashboardTabs from "../components/DashboardTabs.jsx";
 import MediaSection from "../components/MediaSection.jsx";
 import { buildApiUrl } from "../lib/api.js";
 
-function DashboardView() {
+function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true }) {
     const [activeView, setActiveView] = useState("movies");
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -110,7 +110,8 @@ function DashboardView() {
         setError("");
         setLoading(true);
         try {
-            const response = await fetch(buildApiUrl("/api/media"), {
+            const params = viewUserId ? `?user_id=${encodeURIComponent(viewUserId)}` : "";
+            const response = await fetch(buildApiUrl(`/api/media${params}`), {
                 headers: {
                     "Content-Type": "application/json",
                     ...getAuthHeaders()
@@ -130,9 +131,10 @@ function DashboardView() {
 
     useEffect(() => {
         loadItems();
-    }, []);
+    }, [viewUserId]);
 
     const openAddModal = (sectionId) => {
+        if (readOnly) return;
         const section = sectionId.includes("watchlist") ? "watchlist" : "seen";
         const type = sectionId.includes("movies")
             ? "movies"
@@ -153,6 +155,7 @@ function DashboardView() {
     };
 
     const handleCreate = async () => {
+        if (readOnly) return;
         if (!formTitle.trim()) return;
         if (addContext.section === "seen" && !formRating) {
             setError("Selecciona una calificación");
@@ -191,6 +194,7 @@ function DashboardView() {
     };
 
     const handleDelete = async (row) => {
+        if (readOnly) return;
         if (!row?.id) return;
         const confirmed = window.confirm(`¿Eliminar "${row.title}"?`);
         if (!confirmed) return;
@@ -214,6 +218,7 @@ function DashboardView() {
     };
 
     const openMarkSeenModal = (row) => {
+        if (readOnly) return;
         setError("");
         setMarkContext({
             id: row.id,
@@ -225,6 +230,7 @@ function DashboardView() {
     };
 
     const handleMarkSeen = async () => {
+        if (readOnly) return;
         if (!markContext.id) return;
         if (!markRating) {
             setError("Selecciona una calificación");
@@ -308,7 +314,7 @@ function DashboardView() {
 
     return (
         <div className="dashboard-shell">
-            <Navbar />
+            {showNavbar ? <Navbar /> : null}
             <main className="dashboard-page">
                 <header className="dashboard-hero">
                     <h1>Gestor de Medios</h1>
@@ -329,10 +335,11 @@ function DashboardView() {
                             onAddClick={openAddModal}
                             onDelete={handleDelete}
                             onMarkSeen={openMarkSeenModal}
+                            readOnly={readOnly}
                         />
                     ))}
                 </section>
-                {addModalOpen ? (
+                {!readOnly && addModalOpen ? (
                     <div className="dashboard-modal-backdrop" onClick={closeAddModal}>
                         <div
                             className="dashboard-modal"
@@ -402,7 +409,7 @@ function DashboardView() {
                         </div>
                     </div>
                 ) : null}
-                {markModalOpen ? (
+                {!readOnly && markModalOpen ? (
                     <div
                         className="dashboard-modal-backdrop"
                         onClick={() => {

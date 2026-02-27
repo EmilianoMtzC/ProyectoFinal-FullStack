@@ -62,7 +62,11 @@ function Login() {
                             if (data?.token) {
                                 localStorage.setItem("token", data.token);
                             }
-                            navigate("/dashboard");
+                            if (data?.user?.role === "admin") {
+                                navigate("/admin");
+                            } else {
+                                navigate("/dashboard");
+                            }
                         },
                         onError: (err) => {
                             setError(err?.message || "Error en login");

@@ -1,4 +1,4 @@
-function MediaTable({ title, columns, rows, isWatchlist, onDelete, onMarkSeen }) {
+function MediaTable({ title, columns, rows, isWatchlist, onDelete, onMarkSeen, readOnly }) {
     return (
         <div className="media-table-card">
             {title ? <h3>{title}</h3> : null}
@@ -21,22 +21,28 @@ function MediaTable({ title, columns, rows, isWatchlist, onDelete, onMarkSeen })
                                 <td>{row.title}</td>
                                 {isWatchlist ? <td>{row.reason || "-"}</td> : null}
                                 <td className="media-actions-cell">
-                                    {isWatchlist ? (
-                                        <button
-                                            type="button"
-                                            className="media-action-btn"
-                                            onClick={() => onMarkSeen(row)}
-                                        >
-                                            Visto
-                                        </button>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        className="media-delete-btn"
-                                        onClick={() => onDelete(row)}
-                                    >
-                                        Eliminar
-                                    </button>
+                                    {!readOnly ? (
+                                        <>
+                                            {isWatchlist ? (
+                                                <button
+                                                    type="button"
+                                                    className="media-action-btn"
+                                                    onClick={() => onMarkSeen(row)}
+                                                >
+                                                    Visto
+                                                </button>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                className="media-delete-btn"
+                                                onClick={() => onDelete(row)}
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <span className="media-readonly">Solo lectura</span>
+                                    )}
                                 </td>
                             </tr>
                         ))
