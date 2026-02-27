@@ -9,6 +9,16 @@ const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 const constants = require('../config/constants');
 
+const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+const resolveRoleForEmail = (email) => {
+    if (!email) return 'user';
+    return adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
+};
+
 const authController = {
     /**
      * Register a new user
@@ -39,14 +49,15 @@ const authController = {
 
             const passwordHash = await bcrypt.hash(password, 10);
             const userId = uuidv4();
+            const role = resolveRoleForEmail(email);
 
             await pool.query(
-                'INSERT INTO users (id, username, email, password_hash) VALUES (?, ?, ?, ?)',
-                [userId, username, email, passwordHash]
+                'INSERT INTO users (id, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+                [userId, username, email, passwordHash, role]
             );
 
             const token = jwt.sign(
-                { userId, username, email },
+                { userId, username, email, role },
                 constants.JWT_SECRET,
                 { expiresIn: constants.JWT_EXPIRES_IN }
             );
@@ -57,7 +68,8 @@ const authController = {
                 user: {
                     id: userId,
                     username,
-                    email
+                    email,
+                    role
                 }
             });
 
@@ -113,7 +125,7 @@ const authController = {
 
             // Generate JWT token
             const token = jwt.sign(
-                { userId: user.id, username: user.username, email: user.email },
+                { userId: user.id, username: user.username, email: user.email, role: user.role },
                 constants.JWT_SECRET,
                 { expiresIn: constants.JWT_EXPIRES_IN }
             );
@@ -125,6 +137,7 @@ const authController = {
                     id: user.id,
                     username: user.username,
                     email: user.email,
+                    role: user.role,
                     display_name: user.display_name,
                     avatar_url: user.avatar_url
                 }
@@ -147,7 +160,7 @@ const authController = {
             const userId = req.user.id;
 
             const [users] = await pool.query(
-                'SELECT id, username, email, display_name, avatar_url, created_at FROM users WHERE id = ?',
+                'SELECT id, username, email, role, display_name, avatar_url, created_at FROM users WHERE id = ?',
                 [userId]
             );
 

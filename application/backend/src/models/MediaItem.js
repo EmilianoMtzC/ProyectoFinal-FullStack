@@ -85,6 +85,50 @@ class MediaItem {
         }
     }
 
+    static async findAll(options = {}) {
+        const connection = await pool.getConnection();
+        try {
+            let sql = `
+                SELECT m.*, mt.name as media_type_name, mt.icon as media_type_icon
+                FROM media_items m
+                LEFT JOIN media_types mt ON m.media_type_id = mt.id
+                WHERE 1=1
+            `;
+            const params = [];
+
+            if (options.status) {
+                sql += ' AND m.status = ?';
+                params.push(options.status);
+            }
+
+            if (options.mediaTypeId) {
+                sql += ' AND m.media_type_id = ?';
+                params.push(options.mediaTypeId);
+            }
+
+            if (options.search) {
+                sql += ' AND (m.title LIKE ? OR m.original_title LIKE ?)';
+                params.push(`%${options.search}%`, `%${options.search}%`);
+            }
+
+            if (options.userId) {
+                sql += ' AND m.user_id = ?';
+                params.push(options.userId);
+            }
+
+            sql += ' ORDER BY m.created_at DESC';
+
+            const [rows] = await connection.execute(sql, params);
+
+            return (rows || []).map(row => ({
+                ...row,
+                media_type: row.media_type || mediaTypeMap[row.media_type_id] || 'movie'
+            }));
+        } finally {
+            connection.release();
+        }
+    }
+
     static async findById(id) {
         const connection = await pool.getConnection();
         try {
@@ -145,6 +189,17 @@ class MediaItem {
         try {
             const sql = 'DELETE FROM media_items WHERE id = ? AND user_id = ?';
             const [result] = await connection.execute(sql, [id, userId]);
+            return result.affectedRows > 0;
+        } finally {
+            connection.release();
+        }
+    }
+
+    static async deleteAny(id) {
+        const connection = await pool.getConnection();
+        try {
+            const sql = 'DELETE FROM media_items WHERE id = ?';
+            const [result] = await connection.execute(sql, [id]);
             return result.affectedRows > 0;
         } finally {
             connection.release();

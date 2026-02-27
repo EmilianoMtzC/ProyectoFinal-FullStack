@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS users (
     display_name VARCHAR(255),
     avatar_url VARCHAR(500),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    role VARCHAR(20) NOT NULL DEFAULT 'user'
 );
 
 -- Media types reference
@@ -173,10 +174,21 @@ const initDatabase = async () => {
             (3, 'game', '🎮')
         `);
 
+        // Ensure role column exists for older schemas
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'");
+        } catch (err) {
+            if (!err.message.includes('Duplicate column')) {
+                console.log('Role column:', err.message);
+            }
+        }
+
+        await connection.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role = ''");
+
         // Insert default user if not exists
         await connection.query(`
-            INSERT IGNORE INTO users (id, username, email, password_hash) VALUES
-            ('default-user', 'default', 'default@example.com', 'placeholder')
+            INSERT IGNORE INTO users (id, username, email, password_hash, role) VALUES
+            ('default-user', 'default', 'default@example.com', 'placeholder', 'user')
         `);
 
         console.log('Database schema initialized');

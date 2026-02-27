@@ -1,5 +1,7 @@
 const MediaItem = require('../models/MediaItem');
 
+const DEFAULT_USER_ID = 'default-user';
+
 // Map frontend media types to database media_type_id
 const mediaTypeMap = {
     'movie': 1,
@@ -21,6 +23,10 @@ const mediaTypeIdToName = {
 // Helper to get user ID from request (from JWT) or fall back to default
 function getUserId(req) {
     return req.user ? req.user.id : DEFAULT_USER_ID;
+}
+
+function isAdmin(req) {
+    return req.user && req.user.role === 'admin';
 }
 
 const mediaController = {
@@ -87,7 +93,16 @@ const mediaController = {
                 }
             }
 
-            const items = await MediaItem.findByUser(getUserId(req), options);
+            let items;
+            if (isAdmin(req)) {
+                const adminOptions = { ...options };
+                if (req.query.user_id) {
+                    adminOptions.userId = req.query.user_id;
+                }
+                items = await MediaItem.findAll(adminOptions);
+            } else {
+                items = await MediaItem.findByUser(getUserId(req), options);
+            }
 
             // Map media_type_id back to string for frontend
             const mappedItems = items.map(item => ({
@@ -112,6 +127,10 @@ const mediaController = {
                 return res.status(404).json({ error: 'Media item not found' });
             }
 
+            if (!isAdmin(req) && mediaItem.user_id !== getUserId(req)) {
+                return res.status(403).json({ error: 'Forbidden', message: 'Not allowed to access this item' });
+            }
+
             // Map media_type_id back to string for frontend
             const mappedItem = {
                 ...mediaItem,
@@ -129,6 +148,15 @@ const mediaController = {
         try {
             const { id } = req.params;
             const { rating, status, reason } = req.body;
+
+            const existing = await MediaItem.findById(id);
+            if (!existing) {
+                return res.status(404).json({ error: 'Media item not found' });
+            }
+
+            if (!isAdmin(req) && existing.user_id !== getUserId(req)) {
+                return res.status(403).json({ error: 'Forbidden', message: 'Not allowed to update this item' });
+            }
 
             // Build update data
             const updateData = {};
@@ -166,7 +194,9 @@ const mediaController = {
         try {
             const { id } = req.params;
 
-            const success = await MediaItem.delete(id, getUserId(req));
+            const success = isAdmin(req)
+                ? await MediaItem.deleteAny(id)
+                : await MediaItem.delete(id, getUserId(req));
             
             if (!success) {
                 return res.status(404).json({ error: 'Media item not found' });
