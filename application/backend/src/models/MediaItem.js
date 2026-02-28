@@ -1,6 +1,5 @@
 const pool = require('../config/database');
 
-// Map media_type_id to media_type string
 const mediaTypeMap = {
     1: 'movie',
     2: 'series',
@@ -56,7 +55,6 @@ class MediaItem {
             `;
             const params = [userId];
 
-            // Filter by status (watchlist or seen)
             if (options.status) {
                 sql += ' AND m.status = ?';
                 params.push(options.status);

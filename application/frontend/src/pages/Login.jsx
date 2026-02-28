@@ -4,7 +4,6 @@ import Input from "../components/input.jsx";
 import ButtonComponent from "../components/ButtonComponent.jsx";
 import { buildApiUrl } from "../lib/api.js";
 
-
 function Login() {
     const navigate = useNavigate();
     const [form, setForm] = useState({

@@ -1,7 +1,4 @@
-/**
- * Authentication Controller
- * Handles user registration and login
- */
+
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -41,7 +38,7 @@ const buildUniqueUsername = async (base) => {
 
     let candidate = normalized;
     let counter = 0;
-    // Try up to 5 variations before falling back to random suffix
+
     while (counter < 5) {
         const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [candidate]);
         if (!rows || rows.length === 0) {
@@ -111,10 +108,7 @@ const issueTokenAndSetCookie = (res, user) => {
 };
 
 const authController = {
-    /**
-     * Register a new user
-     * POST /api/auth/register
-     */
+    
     async register(req, res) {
         try {
             const { username, email, password } = req.body;
@@ -175,15 +169,11 @@ const authController = {
         }
     },
 
-    /**
-     * Login user
-     * POST /api/auth/login
-     */
+    
     async login(req, res) {
         try {
             const { username, password } = req.body;
 
-            // Validate required fields
             if (!username || !password) {
                 return res.status(400).json({
                     error: 'Missing credentials',
@@ -191,7 +181,6 @@ const authController = {
                 });
             }
 
-            // Find user by username or email
             const [users] = await pool.query(
                 'SELECT * FROM users WHERE username = ? OR email = ?',
                 [username, username]
@@ -206,7 +195,6 @@ const authController = {
 
             const user = users[0];
 
-            // Compare password
             const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
             if (!isPasswordValid) {
@@ -216,7 +204,6 @@ const authController = {
                 });
             }
 
-            // Generate JWT token
             const token = issueTokenAndSetCookie(res, user);
 
             res.json({
@@ -240,10 +227,7 @@ const authController = {
         }
     },
 
-    /**
-     * Get current user profile
-     * GET /api/auth/me
-     */
+    
     async getMe(req, res) {
         try {
             const userId = req.user.id;

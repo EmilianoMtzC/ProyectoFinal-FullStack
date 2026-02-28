@@ -1,8 +1,6 @@
 const mysql = require('mysql2/promise');
 const path = require('path');
 
-// Create a connection pool
-// Support both Railway (internal hostname) and local testing (public URL)
 const isRailway = process.env.RAILWAY_ENVIRONMENT === 'true' || process.env.DB_HOST;
 
 let dbConfig = {
@@ -16,7 +14,6 @@ let dbConfig = {
     queueLimit: 0
 };
 
-// If using public URL for local testing, parse it
 if (process.env.DB_URL) {
     const urlMatch = process.env.DB_URL.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
     if (urlMatch) {
@@ -35,7 +32,6 @@ if (process.env.DB_URL) {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test the connection
 pool.getConnection()
     .then(connection => {
         console.log('Connected to MySQL database');
@@ -45,9 +41,8 @@ pool.getConnection()
         console.error('Error connecting to MySQL database:', err.message);
     });
 
-// Database schema for MySQL (without index creation - indexes created separately)
 const schema = `
--- Users table
+
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
@@ -62,7 +57,6 @@ CREATE TABLE IF NOT EXISTS users (
     oauth_provider_id VARCHAR(255) NULL
 );
 
--- Media types reference
 CREATE TABLE IF NOT EXISTS media_types (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(50) UNIQUE NOT NULL,
@@ -70,7 +64,6 @@ CREATE TABLE IF NOT EXISTS media_types (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Media items table
 CREATE TABLE IF NOT EXISTS media_items (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
@@ -89,7 +82,6 @@ CREATE TABLE IF NOT EXISTS media_items (
     FOREIGN KEY (media_type_id) REFERENCES media_types(id)
 );
 
--- Watchlist entries
 CREATE TABLE IF NOT EXISTS watchlist (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
@@ -101,7 +93,6 @@ CREATE TABLE IF NOT EXISTS watchlist (
     FOREIGN KEY (media_item_id) REFERENCES media_items(id) ON DELETE CASCADE
 );
 
--- Custom lists
 CREATE TABLE IF NOT EXISTS custom_lists (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
@@ -125,7 +116,6 @@ CREATE TABLE IF NOT EXISTS custom_list_items (
 );
 `;
 
-// Index creation statements (run separately to avoid errors)
 const indexStatements = [
     'CREATE UNIQUE INDEX uniq_users_oauth_provider_id ON users(oauth_provider, oauth_provider_id)',
     'CREATE INDEX idx_media_user ON media_items(user_id)',
@@ -136,12 +126,10 @@ const indexStatements = [
     'CREATE INDEX idx_custom_list_user ON custom_lists(user_id)'
 ];
 
-// Initialize database tables
 const initDatabase = async () => {
     try {
         const connection = await pool.getConnection();
-        
-        // Split schema into individual statements and execute
+
         const statements = schema.split(';').filter(stmt => stmt.trim());
         
         for (const statement of statements) {
@@ -149,7 +137,7 @@ const initDatabase = async () => {
                 try {
                     await connection.query(statement);
                 } catch (err) {
-                    // Ignore "Table already exists" errors
+
                     if (!err.message.includes('already exists')) {
                         console.log('Schema statement:', err.message);
                     }
@@ -157,19 +145,17 @@ const initDatabase = async () => {
             }
         }
 
-        // Create indexes (ignore if already exist)
         for (const indexSql of indexStatements) {
             try {
                 await connection.query(indexSql);
             } catch (err) {
-                // Ignore "Duplicate key name" errors
+
                 if (!err.message.includes('Duplicate key name')) {
                     console.log('Index creation:', err.message);
                 }
             }
         }
 
-        // Insert default media types if not exists
         await connection.query(`
             INSERT IGNORE INTO media_types (id, name, icon) VALUES
             (1, 'movie', '🎬'),
@@ -177,7 +163,6 @@ const initDatabase = async () => {
             (3, 'game', '🎮')
         `);
 
-        // Ensure role column exists for older schemas
         try {
             await connection.query("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'");
         } catch (err) {
@@ -187,7 +172,6 @@ const initDatabase = async () => {
         }
 
         await connection.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role = ''");
-
 
         try {
             await connection.query("ALTER TABLE users ADD COLUMN oauth_provider VARCHAR(50) NULL");
@@ -205,7 +189,6 @@ const initDatabase = async () => {
             }
         }
 
-        // Insert default user if not exists
         await connection.query(`
             INSERT IGNORE INTO users (id, username, email, password_hash, role) VALUES
             ('default-user', 'default', 'default@example.com', 'placeholder', 'user')
@@ -218,8 +201,6 @@ const initDatabase = async () => {
     }
 };
 
-// Call init on module load
 initDatabase();
 
-// Export the pool for use in models
 module.exports = pool;

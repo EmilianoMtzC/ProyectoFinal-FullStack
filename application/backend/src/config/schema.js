@@ -4,7 +4,6 @@ const fs = require('fs');
 
 const dbPath = path.join(__dirname, '..', '..', '..', 'data', 'media_tracker.db');
 
-// Ensure data directory exists
 const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -13,7 +12,7 @@ if (!fs.existsSync(dataDir)) {
 const db = new sqlite3.Database(dbPath);
 
 const schema = `
--- Users table
+
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -25,7 +24,6 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Media types reference
 CREATE TABLE IF NOT EXISTS media_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
@@ -33,7 +31,6 @@ CREATE TABLE IF NOT EXISTS media_types (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Media items table
 CREATE TABLE IF NOT EXISTS media_items (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -53,7 +50,6 @@ CREATE TABLE IF NOT EXISTS media_items (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Watchlist entries
 CREATE TABLE IF NOT EXISTS watchlist (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -63,7 +59,6 @@ CREATE TABLE IF NOT EXISTS watchlist (
     UNIQUE(user_id, media_item_id)
 );
 
--- Custom lists
 CREATE TABLE IF NOT EXISTS custom_lists (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -83,7 +78,6 @@ CREATE TABLE IF NOT EXISTS custom_list_items (
     UNIQUE(list_id, media_item_id)
 );
 
--- Indexes
 CREATE INDEX IF NOT EXISTS idx_media_user ON media_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_media_type ON media_items(media_type_id);
 CREATE INDEX IF NOT EXISTS idx_media_watched ON media_items(user_id, watched);
@@ -92,7 +86,6 @@ CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_custom_list_user ON custom_lists(user_id);
 `;
 
-// Initialize database
 db.serialize(() => {
     db.run('PRAGMA foreign_keys = ON');
     db.run('PRAGMA journal_mode = WAL');
@@ -105,7 +98,6 @@ db.serialize(() => {
         }
     });
 
-    // Insert default media types if not exists
     const insertMediaTypes = `
         INSERT OR IGNORE INTO media_types (id, name, icon) VALUES
         (1, 'movie', '🎬'),

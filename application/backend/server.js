@@ -1,7 +1,4 @@
-/**
- * Media Tracker Backend Server
- * Main entry point for the Express API
- */
+
 
 require('dotenv').config();
 
@@ -11,18 +8,15 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const passport = require('passport');
 
-// Import routes
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const { allowedOrigins } = require('./src/config/oauth');
 require('./src/config/passport');
 
-// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) {
@@ -40,15 +34,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
-// Serve static files from frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
@@ -57,7 +48,6 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// API documentation endpoint
 app.get('/api', (req, res) => {
     res.json({
         name: 'Media Tracker API',
@@ -79,12 +69,10 @@ app.get('/api', (req, res) => {
     });
 });
 
-// Serve frontend for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err);
     res.status(500).json({ 
@@ -93,13 +81,10 @@ app.use((err, req, res, next) => {
     });
 });
 
-// 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-
-// Start server
 app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════════════════════╗

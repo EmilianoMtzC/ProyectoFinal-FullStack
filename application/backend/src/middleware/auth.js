@@ -1,14 +1,11 @@
-/**
- * Authentication Middleware
- * Verifies JWT tokens and protects routes
- */
+
 
 const jwt = require('jsonwebtoken');
 const constants = require('../config/constants');
 
 const authMiddleware = (req, res, next) => {
     try {
-        // Get token from header or cookie
+
         const authHeader = req.headers.authorization;
         const cookieToken = req.cookies && req.cookies.auth_token;
 
@@ -19,11 +16,9 @@ const authMiddleware = (req, res, next) => {
             });
         }
 
-        // Prefer Authorization header over cookie to avoid stale-session collisions
-        // (e.g. old admin cookie overriding current OAuth bearer token).
         let token = null;
         if (authHeader) {
-            // Check if it's a Bearer token
+
             const parts = authHeader.split(' ');
             if (parts.length !== 2 || parts[0] !== 'Bearer') {
                 return res.status(401).json({ 
@@ -36,10 +31,8 @@ const authMiddleware = (req, res, next) => {
             token = cookieToken;
         }
 
-        // Verify the token
         const decoded = jwt.verify(token, constants.JWT_SECRET);
 
-        // Attach user data to request
         req.user = {
             id: decoded.userId,
             username: decoded.username,

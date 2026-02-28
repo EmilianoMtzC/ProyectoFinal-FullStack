@@ -1,12 +1,8 @@
-/**
- * Auth Middleware Tests
- * Unit tests for JWT authentication middleware
- */
+
 
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../src/middleware/auth');
 
-// Mock the constants module
 jest.mock('../src/config/constants', () => ({
     JWT_SECRET: 'test_secret_key_for_testing_purposes_32chars',
     JWT_EXPIRES_IN: '1h'

@@ -2,7 +2,6 @@ const MediaItem = require('../models/MediaItem');
 
 const DEFAULT_USER_ID = 'default-user';
 
-// Map frontend media types to database media_type_id
 const mediaTypeMap = {
     'movie': 1,
     'movies': 1,
@@ -13,14 +12,12 @@ const mediaTypeMap = {
     'games': 3
 };
 
-// Map database media_type_id to frontend media_type string
 const mediaTypeIdToName = {
     1: 'movie',
     2: 'series',
     3: 'game'
 };
 
-// Helper to get user ID from request (from JWT) or fall back to default
 function getUserId(req) {
     return req.user ? req.user.id : DEFAULT_USER_ID;
 }
@@ -45,10 +42,8 @@ const mediaController = {
                 return res.status(400).json({ error: 'Title is required' });
             }
 
-            // Normalize media_type to get media_type_id
             const normalizedMediaType = mediaTypeMap[media_type?.toLowerCase()] || 1;
-            
-            // Status: 'watchlist' or 'seen'
+
             const itemStatus = status || 'watchlist';
 
             const mediaItem = await MediaItem.create({
@@ -75,17 +70,14 @@ const mediaController = {
         try {
             const { media_type, status, search } = req.query;
 
-            // Build filter options
             const options = {
                 search: search || null
             };
 
-            // Filter by status (watchlist or seen)
             if (status) {
                 options.status = status;
             }
 
-            // Filter by media type if provided
             if (media_type) {
                 const mediaTypeId = mediaTypeMap[media_type.toLowerCase()];
                 if (mediaTypeId) {
@@ -98,12 +90,10 @@ const mediaController = {
                 const adminOptions = { ...options, userId: req.query.user_id };
                 items = await MediaItem.findAll(adminOptions);
             } else {
-                // Default behavior (including admins without explicit user_id):
-                // only return the authenticated user's own items.
+
                 items = await MediaItem.findByUser(getUserId(req), options);
             }
 
-            // Map media_type_id back to string for frontend
             const mappedItems = items.map(item => ({
                 ...item,
                 media_type: mediaTypeIdToName[item.media_type_id] || 'movie'
@@ -130,7 +120,6 @@ const mediaController = {
                 return res.status(403).json({ error: 'Forbidden', message: 'Not allowed to access this item' });
             }
 
-            // Map media_type_id back to string for frontend
             const mappedItem = {
                 ...mediaItem,
                 media_type: mediaTypeIdToName[mediaItem.media_type_id] || 'movie'
@@ -157,7 +146,6 @@ const mediaController = {
                 return res.status(403).json({ error: 'Forbidden', message: 'Not allowed to update this item' });
             }
 
-            // Build update data
             const updateData = {};
             
             if (rating !== undefined) {

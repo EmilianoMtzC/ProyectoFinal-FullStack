@@ -1,17 +1,12 @@
-/**
- * Auth Controller Tests
- * Unit tests for authentication controller (register, login, getMe)
- */
+
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Mock uuid
 jest.mock('uuid', () => ({
     v4: jest.fn(() => 'mock-uuid-123')
 }));
 
-// Mock dependencies before importing the controller
 jest.mock('../src/config/database', () => ({
     query: jest.fn()
 }));
@@ -111,10 +106,9 @@ describe('Auth Controller', () => {
                     password: 'password123',
                     display_name: 'New User'
                 };
-                
-                // Mock user not exists
+
                 pool.query.mockResolvedValueOnce([[]])
-                    // Mock insert
+
                     .mockResolvedValueOnce([{ insertId: 1 }]);
 
                 await authController.register(mockReq, mockRes);
@@ -161,7 +155,6 @@ describe('Auth Controller', () => {
 
                 await authController.register(mockReq, mockRes);
 
-                // Verify password was hashed (check insert was called)
                 expect(pool.query).toHaveBeenCalledTimes(2);
             });
         });
