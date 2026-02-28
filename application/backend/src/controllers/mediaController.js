@@ -94,13 +94,12 @@ const mediaController = {
             }
 
             let items;
-            if (isAdmin(req)) {
-                const adminOptions = { ...options };
-                if (req.query.user_id) {
-                    adminOptions.userId = req.query.user_id;
-                }
+            if (isAdmin(req) && req.query.user_id) {
+                const adminOptions = { ...options, userId: req.query.user_id };
                 items = await MediaItem.findAll(adminOptions);
             } else {
+                // Default behavior (including admins without explicit user_id):
+                // only return the authenticated user's own items.
                 items = await MediaItem.findByUser(getUserId(req), options);
             }
 
