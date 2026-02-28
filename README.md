@@ -260,15 +260,15 @@ Las evidencias visuales se encuentran en la carpeta [`screenshots`](screenshots)
 
 ### Evidencia en video de OAuth
 
-> Nota: GitHub no reproduce de forma embebida videos locales dentro de README. Se visualizan al abrir el enlace del archivo MP4 en el repositorio.
+> Nota: se reemplazó la evidencia en video por GIF para visualización directa en GitHub.
 
 - **Login con Google**: flujo completo de autenticación OAuth y retorno a la aplicación.
 
-  [▶ Ver video OAuth con Google (MP4)](screenshots/LoginGoogle.mp4)
+  ![OAuth Google Login](screenshots/LoginGoogle.gif)
 
 - **Login con GitHub**: flujo completo de autenticación OAuth y retorno a la aplicación.
 
-  [▶ Ver video OAuth con GitHub (MP4)](screenshots/LoginGitHub.mp4)
+  ![OAuth GitHub Login](screenshots/LoginGitHub.gif)
 
 ### 2) Flujo principal del dashboard de usuario
 
