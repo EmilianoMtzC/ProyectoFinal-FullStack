@@ -157,72 +157,158 @@ Se utiliza:
 
 ---
 
-## 🧪 Pruebas realizadas (POST, GET y PUT)
+## 🧪 Pruebas con Jest (unitarias, funcionales y seguridad)
 
-### 1) POST - Registro
-Endpoint: `POST /api/auth/register`
+El backend usa Jest para validar autenticación, autorización por rol y protección de rutas.
 
-Body ejemplo:
-```json
-{
-  "username": "nuevo_usuario",
-  "email": "nuevo@email.com",
-  "password": "12345678"
-}
+### Cómo ejecutar las pruebas
+
+Desde [`application/backend`](application/backend):
+
+```bash
+npm test -- --runInBand
 ```
 
-Resultado esperado:
-- `201 Created`
-- Retorna `token` y objeto `user`.
+Scripts disponibles en [`package.json`](application/backend/package.json):
+- `npm test`
+- `npm run test:watch`
+- `npm run test:coverage`
 
-Cobertura relacionada en pruebas: [`authController.test.js`](application/backend/tests/authController.test.js).
+### Suite 1: Controlador de autenticación (unitarias)
 
-### 2) GET - Perfil autenticado
-Endpoint: `GET /api/auth/me`
+Archivo: [`authController.test.js`](application/backend/tests/authController.test.js)
 
-Headers:
-```http
-Authorization: Bearer <token>
-```
+Valida la lógica de [`register()`](application/backend/src/controllers/authController.js:112), [`login()`](application/backend/src/controllers/authController.js:173) y [`getMe()`](application/backend/src/controllers/authController.js:231), incluyendo:
 
-Resultado esperado:
-- `200 OK`
-- Retorna `{ user: {...} }`.
+- Validación de campos requeridos (`400`) en registro/login.
+- Detección de usuario existente (`409`) en registro.
+- Registro exitoso (`201`) con emisión de token JWT y cookie de sesión.
+- Login fallido por credenciales inválidas (`401`).
+- Login exitoso con retorno de usuario + token + cookie.
+- Obtención de perfil autenticado y manejo de usuario inexistente (`404`).
 
-Lógica del endpoint: [`authController.getMe()`](application/backend/src/controllers/authController.js:231).
+> Nota técnica: se mockea la base de datos para aislar la lógica del controlador y convertir estas pruebas en unitarias puras.
 
-### 3) PUT - Actualización de medio (marcar como visto)
-Endpoint: `PUT /api/media/:id`
+### Suite 2: Middleware JWT (seguridad de autenticación)
 
-Body ejemplo:
-```json
-{
-  "status": "seen",
-  "rating": "liked"
-}
-```
+Archivo: [`authMiddleware.test.js`](application/backend/tests/authMiddleware.test.js)
 
-Resultado esperado:
-- `200 OK`
-- El ítem pasa de watchlist a vistos con calificación.
+Valida el comportamiento de [`authMiddleware`](application/backend/src/middleware/auth.js:6):
 
-Consumo desde frontend en [`handleMarkSeen()`](application/frontend/src/pages/DashboardView.jsx:247).
+- Rechaza requests sin token (`401`).
+- Rechaza formatos inválidos de `Authorization` (`401`).
+- Acepta token válido por header Bearer.
+- Acepta token válido por cookie `auth_token`.
+- Rechaza token inválido (`401`).
+- Rechaza token expirado (`401`).
+
+Estas pruebas cubren escenarios clave de seguridad de autenticación y manejo de errores en rutas protegidas.
+
+### Suite 3: Middleware de rol admin (autorización)
+
+Archivo: [`requireAdmin.test.js`](application/backend/tests/requireAdmin.test.js)
+
+Valida la lógica de [`requireAdmin`](application/backend/src/middleware/requireAdmin.js:1):
+
+- Bloquea acceso si no existe usuario autenticado (`403`).
+- Bloquea acceso si el rol no es `admin` (`403`).
+- Permite acceso cuando el rol sí es `admin`.
+
+### Suite 4: Control de acceso a recursos de media (funcionales + seguridad)
+
+Archivo: [`mediaController.authorization.test.js`](application/backend/tests/mediaController.authorization.test.js)
+
+Valida reglas de autorización sobre rutas protegidas de medios en [`mediaController.getById()`](application/backend/src/controllers/mediaController.js:109) y [`mediaController.update()`](application/backend/src/controllers/mediaController.js:135):
+
+- Un usuario regular no puede consultar un ítem que pertenece a otro usuario (`403`).
+- Un usuario regular no puede actualizar ítems de otro usuario (`403`).
+- Un administrador sí puede consultar recursos de otros usuarios (control administrativo).
+
+Esta suite fortalece la protección contra acceso horizontal indebido (IDOR) y verifica que las políticas de rol/propiedad se cumplan.
+
+### Resumen de cobertura actual
+
+- **Unitarias**: lógica de autenticación y perfil.
+- **Funcionales (backend)**: flujo de autorización en controladores/middlewares críticos.
+- **Seguridad**: pruebas de autenticación JWT, expiración de token, validación de formato y autorización por rol/propiedad.
+
+Con esto se asegura robustez en las rutas protegidas y se reduce el riesgo de accesos no autorizados.
 
 ---
 
 ## 📸 Capturas de pantalla de la aplicación
 
-Actualmente el repositorio no contiene archivos de captura (`.png` / `.jpg`).
+Las evidencias visuales se encuentran en la carpeta [`screenshots`](screenshots) y están ordenadas por flujo funcional.
 
-Se deja esta sección para documentar la evidencia visual final:
+### 1) Inicio de sesión y registro (usuario)
 
-1. Pantalla de Login
-2. Pantalla de Registro
-3. Dashboard usuario (películas/series/juegos)
-4. Flujo OAuth (redirección y sesión iniciada)
-5. Dashboard de administrador
+1. **Pantalla de login inicial**: formulario de acceso y botones de autenticación.
 
-> Recomendación: guardar capturas en `docs/screenshots/` y enlazarlas aquí.
+   ![Pantalla de Login](screenshots/LoginPage.png)
+
+2. **Pantalla de registro**: alta de nuevo usuario con validación de campos.
+
+   ![Pantalla de Registro](screenshots/RegisterPage.png)
+
+3. **Proceso de registro exitoso**: confirmación de creación de cuenta.
+
+   ![Proceso de Registro](screenshots/RegisterProcess.png)
+
+4. **Inicio de sesión con cuenta creada**: autenticación correcta y redirección al dashboard.
+
+   ![Login con cuenta creada](screenshots/LoginWithTheCreatedAccount.png)
+
+### Evidencia en video de OAuth
+
+- **Login con Google**: flujo completo de autenticación OAuth y retorno a la aplicación.
+
+  <video src="screenshots/LoginGoogle.mp4" controls width="720"></video>
+
+- **Login con GitHub**: flujo completo de autenticación OAuth y retorno a la aplicación.
+
+  <video src="screenshots/LoginGitHub.mp4" controls width="720"></video>
+
+### 2) Flujo principal del dashboard de usuario
+
+5. **Dashboard de usuario (vista general)**: panel principal con secciones de medios.
+
+   ![Dashboard Usuario](screenshots/User%20DashboardView.png)
+
+6. **Dashboard con más contenido cargado**: estado con lista completa de ítems.
+
+   ![Dashboard Usuario con items](screenshots/User%20DashboardView%20with%20full%20items.png)
+
+7. **Cambio de estado Watchlist → Seen**: acción de negocio para marcar un ítem como visto.
+
+   ![Watchlist a Seen](screenshots/WatchlistToSeenItem.png)
+
+8. **Ítem actualizado**: evidencia del cambio aplicado en la interfaz.
+
+   ![Item actualizado](screenshots/ItemChanged.png)
+
+9. **Proceso de cierre de sesión**: invalidación de sesión y salida del panel.
+
+   ![Proceso de Logout](screenshots/LogOutProcess.png)
+
+### 3) Flujo administrativo
+
+10. **Login de administrador**: acceso con credenciales de rol admin.
+
+    ![Login Admin](screenshots/AdminLogin.png)
+
+11. **Dashboard de administrador**: vista de administración de usuarios y recursos.
+
+    ![Dashboard Admin](screenshots/AdminDashboardView.png)
+
+12. **Eliminación de usuario**: operación administrativa de borrado controlado.
+
+    ![Eliminar usuario](screenshots/DeleteAUser.png)
+
+13. **Eliminación de ítem de un usuario**: administración de contenido asociado a cuentas.
+
+    ![Eliminar item de usuario](screenshots/DeleteAnItemOfAUser.png)
+
+Estas capturas documentan los flujos clave de autenticación, gestión de sesión, operaciones CRUD del usuario y operaciones administrativas con control por roles.
 
 ---
 
