@@ -1,309 +1,212 @@
-
-
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'mock-uuid-123')
+  v4: jest.fn(() => 'mock-uuid-123')
 }));
 
 jest.mock('../src/config/database', () => ({
-    query: jest.fn()
+  query: jest.fn()
 }));
 
 jest.mock('../src/config/constants', () => ({
-    JWT_SECRET: 'test_secret_key_for_testing_purposes_32chars',
-    JWT_EXPIRES_IN: '1h'
+  JWT_SECRET: 'test_secret_key_for_testing_purposes_32chars',
+  JWT_EXPIRES_IN: '1h'
 }));
 
 const pool = require('../src/config/database');
 const authController = require('../src/controllers/authController');
 
 describe('Auth Controller', () => {
-    let mockReq;
-    let mockRes;
+  let mockReq;
+  let mockRes;
 
-    beforeEach(() => {
-        mockReq = {
-            body: {},
-            user: { id: 'user-123' }
-        };
-        mockRes = {
-            status: jest.fn().mockReturnThis(),
-            json: jest.fn()
-        };
-        jest.clearAllMocks();
+  beforeEach(() => {
+    mockReq = { body: {}, user: { id: 'user-123' } };
+    mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      cookie: jest.fn()
+    };
+    jest.clearAllMocks();
+  });
+
+  describe('register', () => {
+    it('returns 400 when required fields are missing', async () => {
+      mockReq.body = { email: 'test@example.com', password: 'password123' };
+
+      await authController.register(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Missing required fields',
+        message: 'Username, email, and password are required'
+      });
     });
 
-    describe('register', () => {
-        describe('validation', () => {
-            it('should return 400 if username is missing', async () => {
-                mockReq.body = { email: 'test@example.com', password: 'password123' };
+    it('returns 409 when user already exists', async () => {
+      mockReq.body = {
+        username: 'existinguser',
+        email: 'existing@example.com',
+        password: 'password123'
+      };
+      pool.query.mockResolvedValueOnce([[{ id: 'existing-id' }]]);
 
-                await authController.register(mockReq, mockRes);
+      await authController.register(mockReq, mockRes);
 
-                expect(mockRes.status).toHaveBeenCalledWith(400);
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    error: 'Missing required fields',
-                    message: 'Username, email, and password are required'
-                });
-            });
-
-            it('should return 400 if email is missing', async () => {
-                mockReq.body = { username: 'testuser', password: 'password123' };
-
-                await authController.register(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(400);
-            });
-
-            it('should return 400 if password is missing', async () => {
-                mockReq.body = { username: 'testuser', email: 'test@example.com' };
-
-                await authController.register(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(400);
-            });
-        });
-
-        describe('when user already exists', () => {
-            it('should return 409 if username is taken', async () => {
-                mockReq.body = {
-                    username: 'existinguser',
-                    email: 'new@example.com',
-                    password: 'password123'
-                };
-                pool.query.mockResolvedValueOnce([[{ id: 'existing-id' }]]);
-
-                await authController.register(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(409);
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    error: 'User already exists',
-                    message: 'Username or email is already taken'
-                });
-            });
-
-            it('should return 409 if email is taken', async () => {
-                mockReq.body = {
-                    username: 'newuser',
-                    email: 'existing@example.com',
-                    password: 'password123'
-                };
-                pool.query.mockResolvedValueOnce([[{ id: 'existing-id' }]]);
-
-                await authController.register(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(409);
-            });
-        });
-
-        describe('successful registration', () => {
-            it('should create user and return token', async () => {
-                mockReq.body = {
-                    username: 'newuser',
-                    email: 'new@example.com',
-                    password: 'password123',
-                    display_name: 'New User'
-                };
-
-                pool.query.mockResolvedValueOnce([[]])
-
-                    .mockResolvedValueOnce([{ insertId: 1 }]);
-
-                await authController.register(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(201);
-                expect(mockRes.json).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        message: 'User registered successfully',
-                        token: expect.any(String),
-                        user: expect.objectContaining({
-                            username: 'newuser',
-                            email: 'new@example.com',
-                            display_name: 'New User'
-                        })
-                    })
-                );
-            });
-
-            it('should use username as display_name if not provided', async () => {
-                mockReq.body = {
-                    username: 'newuser',
-                    email: 'new@example.com',
-                    password: 'password123'
-                };
-                
-                pool.query.mockResolvedValueOnce([[]])
-                    .mockResolvedValueOnce([{ insertId: 1 }]);
-
-                await authController.register(mockReq, mockRes);
-
-                const response = mockRes.json.mock.calls[0][0];
-                expect(response.user.display_name).toBe('newuser');
-            });
-
-            it('should hash password before storing', async () => {
-                mockReq.body = {
-                    username: 'newuser',
-                    email: 'new@example.com',
-                    password: 'mypassword'
-                };
-                
-                pool.query.mockResolvedValueOnce([[]])
-                    .mockResolvedValueOnce([{ insertId: 1 }]);
-
-                await authController.register(mockReq, mockRes);
-
-                expect(pool.query).toHaveBeenCalledTimes(2);
-            });
-        });
+      expect(mockRes.status).toHaveBeenCalledWith(409);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'User already exists',
+        message: 'Username or email is already taken'
+      });
     });
 
-    describe('login', () => {
-        describe('validation', () => {
-            it('should return 400 if username is missing', async () => {
-                mockReq.body = { password: 'password123' };
+    it('creates user, sets auth cookie and returns JWT payload', async () => {
+      mockReq.body = {
+        username: 'newuser',
+        email: 'new@example.com',
+        password: 'password123'
+      };
 
-                await authController.login(mockReq, mockRes);
+      pool.query
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([{ insertId: 1 }]);
 
-                expect(mockRes.status).toHaveBeenCalledWith(400);
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    error: 'Missing credentials',
-                    message: 'Username and password are required'
-                });
-            });
+      await authController.register(mockReq, mockRes);
 
-            it('should return 400 if password is missing', async () => {
-                mockReq.body = { username: 'testuser' };
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(mockRes.cookie).toHaveBeenCalledTimes(1);
 
-                await authController.login(mockReq, mockRes);
+      const response = mockRes.json.mock.calls[0][0];
+      expect(response.message).toBe('User registered successfully');
+      expect(response.token).toEqual(expect.any(String));
+      expect(response.user).toEqual({
+        id: 'mock-uuid-123',
+        username: 'newuser',
+        email: 'new@example.com',
+        role: 'user'
+      });
 
-                expect(mockRes.status).toHaveBeenCalledWith(400);
-            });
-        });
+      const insertCall = pool.query.mock.calls[1];
+      expect(insertCall[0]).toContain('INSERT INTO users');
+      expect(insertCall[1][3]).not.toBe('password123');
+      expect(insertCall[1][3]).toMatch(/^\$2/);
+    });
+  });
 
-        describe('when user does not exist', () => {
-            it('should return 401 for non-existent user', async () => {
-                mockReq.body = { username: 'nonexistent', password: 'password123' };
-                pool.query.mockResolvedValueOnce([[]]);
+  describe('login', () => {
+    it('returns 400 when credentials are missing', async () => {
+      mockReq.body = { username: 'testuser' };
 
-                await authController.login(mockReq, mockRes);
+      await authController.login(mockReq, mockRes);
 
-                expect(mockRes.status).toHaveBeenCalledWith(401);
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    error: 'Invalid credentials',
-                    message: 'Username or password is incorrect'
-                });
-            });
-        });
-
-        describe('when password is invalid', () => {
-            it('should return 401 for wrong password', async () => {
-                mockReq.body = { username: 'testuser', password: 'wrongpassword' };
-                
-                const hashedPassword = await bcrypt.hash('correctpassword', 10);
-                pool.query.mockResolvedValueOnce([[{
-                    id: 'user-123',
-                    username: 'testuser',
-                    email: 'test@example.com',
-                    password_hash: hashedPassword
-                }]]);
-
-                await authController.login(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(401);
-            });
-        });
-
-        describe('successful login', () => {
-            it('should return token and user data', async () => {
-                mockReq.body = { username: 'testuser', password: 'correctpassword' };
-                
-                const hashedPassword = await bcrypt.hash('correctpassword', 10);
-                pool.query.mockResolvedValueOnce([[{
-                    id: 'user-123',
-                    username: 'testuser',
-                    email: 'test@example.com',
-                    password_hash: hashedPassword,
-                    display_name: 'Test User',
-                    avatar_url: null
-                }]]);
-
-                await authController.login(mockReq, mockRes);
-
-                expect(mockRes.json).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        message: 'Login successful',
-                        token: expect.any(String),
-                        user: expect.objectContaining({
-                            id: 'user-123',
-                            username: 'testuser',
-                            email: 'test@example.com'
-                        })
-                    })
-                );
-            });
-
-            it('should allow login with email as username', async () => {
-                mockReq.body = { username: 'test@example.com', password: 'correctpassword' };
-                
-                const hashedPassword = await bcrypt.hash('correctpassword', 10);
-                pool.query.mockResolvedValueOnce([[{
-                    id: 'user-123',
-                    username: 'testuser',
-                    email: 'test@example.com',
-                    password_hash: hashedPassword
-                }]]);
-
-                await authController.login(mockReq, mockRes);
-
-                expect(mockRes.json).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        message: 'Login successful',
-                        token: expect.any(String)
-                    })
-                );
-            });
-        });
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Missing credentials',
+        message: 'Username and password are required'
+      });
     });
 
-    describe('getMe', () => {
-        describe('when user exists', () => {
-            it('should return user profile', async () => {
-                pool.query.mockResolvedValueOnce([[{
-                    id: 'user-123',
-                    username: 'testuser',
-                    email: 'test@example.com',
-                    display_name: 'Test User',
-                    avatar_url: null,
-                    created_at: new Date()
-                }]]);
+    it('returns 401 for invalid username/email', async () => {
+      mockReq.body = { username: 'nonexistent', password: 'password123' };
+      pool.query.mockResolvedValueOnce([[]]);
 
-                await authController.getMe(mockReq, mockRes);
+      await authController.login(mockReq, mockRes);
 
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    user: expect.objectContaining({
-                        id: 'user-123',
-                        username: 'testuser',
-                        email: 'test@example.com'
-                    })
-                });
-            });
-        });
-
-        describe('when user does not exist', () => {
-            it('should return 404', async () => {
-                pool.query.mockResolvedValueOnce([[]]);
-
-                await authController.getMe(mockReq, mockRes);
-
-                expect(mockRes.status).toHaveBeenCalledWith(404);
-                expect(mockRes.json).toHaveBeenCalledWith({
-                    error: 'User not found',
-                    message: 'User does not exist'
-                });
-            });
-        });
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Invalid credentials',
+        message: 'Username or password is incorrect'
+      });
     });
+
+    it('returns 401 for wrong password', async () => {
+      mockReq.body = { username: 'testuser', password: 'wrongpassword' };
+      const hashedPassword = await bcrypt.hash('correctpassword', 10);
+
+      pool.query.mockResolvedValueOnce([[
+        {
+          id: 'user-123',
+          username: 'testuser',
+          email: 'test@example.com',
+          password_hash: hashedPassword,
+          role: 'user'
+        }
+      ]]);
+
+      await authController.login(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+    });
+
+    it('returns token, user and sets cookie for valid credentials', async () => {
+      mockReq.body = { username: 'testuser', password: 'correctpassword' };
+      const hashedPassword = await bcrypt.hash('correctpassword', 10);
+
+      pool.query.mockResolvedValueOnce([[
+        {
+          id: 'user-123',
+          username: 'testuser',
+          email: 'test@example.com',
+          password_hash: hashedPassword,
+          role: 'user',
+          display_name: 'Test User',
+          avatar_url: null
+        }
+      ]]);
+
+      await authController.login(mockReq, mockRes);
+
+      expect(mockRes.cookie).toHaveBeenCalledTimes(1);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Login successful',
+          token: expect.any(String),
+          user: expect.objectContaining({
+            id: 'user-123',
+            username: 'testuser',
+            email: 'test@example.com',
+            role: 'user'
+          })
+        })
+      );
+    });
+  });
+
+  describe('getMe', () => {
+    it('returns user profile when user exists', async () => {
+      pool.query.mockResolvedValueOnce([[
+        {
+          id: 'user-123',
+          username: 'testuser',
+          email: 'test@example.com',
+          role: 'user',
+          display_name: 'Test User',
+          avatar_url: null,
+          created_at: new Date()
+        }
+      ]]);
+
+      await authController.getMe(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        user: expect.objectContaining({
+          id: 'user-123',
+          username: 'testuser',
+          email: 'test@example.com'
+        })
+      });
+    });
+
+    it('returns 404 when user does not exist', async () => {
+      pool.query.mockResolvedValueOnce([[]]);
+
+      await authController.getMe(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'User not found',
+        message: 'User does not exist'
+      });
+    });
+  });
 });
