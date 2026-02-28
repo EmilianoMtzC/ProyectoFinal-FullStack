@@ -34,11 +34,16 @@ router.delete('/users/:id', async (req, res) => {
             return res.status(400).json({ error: 'Cannot delete your own account' });
         }
 
-        const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
-
-        if (!result || result.affectedRows === 0) {
+        const [rows] = await pool.query('SELECT role FROM users WHERE id = ?', [id]);
+        if (!rows || rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+
+        if (rows[0].role === 'admin') {
+            return res.status(400).json({ error: 'Cannot delete admin users' });
+        }
+
+        const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
 
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
