@@ -32,7 +32,7 @@ function Login() {
                     name="identifier"
                     value={form.identifier}
                     onChange={handleChange}
-                    placeholder="Email o usuario"
+                    placeholder="Email or username"
                     required
                 />
                 <Input
