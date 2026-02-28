@@ -19,8 +19,10 @@ const authMiddleware = (req, res, next) => {
             });
         }
 
-        let token = cookieToken;
-        if (!token && authHeader) {
+        // Prefer Authorization header over cookie to avoid stale-session collisions
+        // (e.g. old admin cookie overriding current OAuth bearer token).
+        let token = null;
+        if (authHeader) {
             // Check if it's a Bearer token
             const parts = authHeader.split(' ');
             if (parts.length !== 2 || parts[0] !== 'Bearer') {
@@ -30,6 +32,8 @@ const authMiddleware = (req, res, next) => {
                 });
             }
             token = parts[1];
+        } else {
+            token = cookieToken;
         }
 
         // Verify the token
