@@ -64,6 +64,9 @@ function Login() {
                             password: form.password
                         }),
                         onSuccess: (data) => {
+                            if (data?.token) {
+                                localStorage.setItem("token", data.token);
+                            }
                             if (data?.user?.role === "admin") {
                                 navigate("/admin");
                             } else {

@@ -134,6 +134,15 @@ function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true,
     };
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const tokenFromQuery = params.get("token");
+        if (tokenFromQuery) {
+            localStorage.setItem("token", tokenFromQuery);
+            params.delete("token");
+            const nextQuery = params.toString();
+            const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+            window.history.replaceState({}, "", nextUrl);
+        }
         loadItems();
     }, [viewUserId]);
 

@@ -44,7 +44,8 @@ router.get(
         if (!token) {
             return res.redirect(getLoginUrl());
         }
-        return res.redirect(getRedirectUrlForRole(req.user.role));
+        const redirectUrl = getRedirectUrlForRole(req.user.role);
+        return res.redirect(`${redirectUrl}?token=${encodeURIComponent(token)}`);
     }
 );
 
@@ -71,7 +72,8 @@ router.get(
         if (!token) {
             return res.redirect(getLoginUrl());
         }
-        return res.redirect(getRedirectUrlForRole(req.user.role));
+        const redirectUrl = getRedirectUrlForRole(req.user.role);
+        return res.redirect(`${redirectUrl}?token=${encodeURIComponent(token)}`);
     }
 );
 
