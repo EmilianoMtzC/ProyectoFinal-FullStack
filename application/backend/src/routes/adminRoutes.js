@@ -10,7 +10,7 @@ router.use(requireAdmin);
 router.get('/users', async (req, res) => {
     try {
         const [users] = await pool.query(
-            'SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC'
+            "SELECT id, username, email, role, created_at FROM users WHERE role <> 'admin' ORDER BY created_at DESC"
         );
         res.json(users);
     } catch (error) {
