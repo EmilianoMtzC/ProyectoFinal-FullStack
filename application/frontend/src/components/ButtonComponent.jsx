@@ -50,7 +50,8 @@ function ButtonComponent({ text, onClick, api, type = "button", className = "", 
                 const response = await fetch(buildApiUrl(path), {
                     method,
                     headers: requestHeaders,
-                    body: resolvedBody ? JSON.stringify(resolvedBody) : undefined
+                    body: resolvedBody ? JSON.stringify(resolvedBody) : undefined,
+                    credentials: "include"
                 });
 
                 const data = await response.json().catch(() => null);

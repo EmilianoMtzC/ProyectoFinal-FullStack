@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 const constants = require('../config/constants');
+const { cookieOptions } = require('../config/oauth');
 
 const adminEmails = (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -17,6 +18,71 @@ const adminEmails = (process.env.ADMIN_EMAILS || '')
 const resolveRoleForEmail = (email) => {
     if (!email) return 'user';
     return adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
+};
+
+const setAuthCookie = (res, token) => {
+    res.cookie('auth_token', token, cookieOptions);
+};
+
+const issueToken = (user) => jwt.sign(
+    { userId: user.id, username: user.username, email: user.email, role: user.role },
+    constants.JWT_SECRET,
+    { expiresIn: constants.JWT_EXPIRES_IN }
+);
+
+const buildUniqueUsername = async (base) => {
+    const normalized = (base || 'user')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 20) || 'user';
+
+    let candidate = normalized;
+    let counter = 0;
+    // Try up to 5 variations before falling back to random suffix
+    while (counter < 5) {
+        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [candidate]);
+        if (!rows || rows.length === 0) {
+            return candidate;
+        }
+        counter += 1;
+        candidate = `${normalized}_${counter}`;
+    }
+
+    const suffix = Math.random().toString(36).slice(2, 6);
+    return `${normalized}_${suffix}`;
+};
+
+const findOrCreateOAuthUser = async ({ email, username, displayName, avatarUrl }) => {
+    if (!email) {
+        throw new Error('OAuth provider did not return an email');
+    }
+
+    const [usersByEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (usersByEmail.length > 0) {
+        return usersByEmail[0];
+    }
+
+    const safeUsername = await buildUniqueUsername(username || email.split('@')[0]);
+    const passwordHash = await bcrypt.hash(uuidv4(), 10);
+    const userId = uuidv4();
+    const role = resolveRoleForEmail(email);
+
+    await pool.query(
+        'INSERT INTO users (id, username, email, password_hash, role, display_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [userId, safeUsername, email, passwordHash, role, displayName || safeUsername, avatarUrl || null]
+    );
+
+    const [createdUsers] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    return createdUsers[0];
+};
+
+const issueTokenAndSetCookie = (res, user) => {
+    const token = issueToken(user);
+    setAuthCookie(res, token);
+    return token;
 };
 
 const authController = {
@@ -61,6 +127,8 @@ const authController = {
                 constants.JWT_SECRET,
                 { expiresIn: constants.JWT_EXPIRES_IN }
             );
+
+            setAuthCookie(res, token);
 
             res.status(201).json({
                 message: 'User registered successfully',
@@ -124,11 +192,7 @@ const authController = {
             }
 
             // Generate JWT token
-            const token = jwt.sign(
-                { userId: user.id, username: user.username, email: user.email, role: user.role },
-                constants.JWT_SECRET,
-                { expiresIn: constants.JWT_EXPIRES_IN }
-            );
+            const token = issueTokenAndSetCookie(res, user);
 
             res.json({
                 message: 'Login successful',
@@ -182,4 +246,8 @@ const authController = {
     }
 };
 
-module.exports = authController;
+module.exports = {
+    ...authController,
+    findOrCreateOAuthUser,
+    issueTokenAndSetCookie
+};

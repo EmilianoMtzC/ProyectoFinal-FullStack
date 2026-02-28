@@ -20,7 +20,8 @@ function AdminDashboard() {
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: token ? `Bearer ${token}` : ""
-                }
+                },
+                credentials: "include"
             });
             const data = await response.json().catch(() => []);
             if (!response.ok) {
@@ -56,7 +57,8 @@ function AdminDashboard() {
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: token ? `Bearer ${token}` : ""
-                }
+                },
+                credentials: "include"
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {

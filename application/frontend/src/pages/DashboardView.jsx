@@ -118,7 +118,8 @@ function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true,
                 headers: {
                     "Content-Type": "application/json",
                     ...getAuthHeaders()
-                }
+                },
+                credentials: "include"
             });
             const data = await response.json().catch(() => []);
             if (!response.ok) {
@@ -181,7 +182,8 @@ function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true,
                     "Content-Type": "application/json",
                     ...getAuthHeaders()
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                credentials: "include"
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -208,7 +210,8 @@ function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true,
                 headers: {
                     "Content-Type": "application/json",
                     ...getAuthHeaders()
-                }
+                },
+                credentials: "include"
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -248,7 +251,8 @@ function DashboardView({ viewUserId = null, readOnly = false, showNavbar = true,
                     "Content-Type": "application/json",
                     ...getAuthHeaders()
                 },
-                body: JSON.stringify({ status: "seen", rating: markRating })
+                body: JSON.stringify({ status: "seen", rating: markRating }),
+                credentials: "include"
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {

@@ -8,26 +8,29 @@ const constants = require('../config/constants');
 
 const authMiddleware = (req, res, next) => {
     try {
-        // Get token from header
+        // Get token from header or cookie
         const authHeader = req.headers.authorization;
+        const cookieToken = req.cookies && req.cookies.auth_token;
 
-        if (!authHeader) {
+        if (!authHeader && !cookieToken) {
             return res.status(401).json({ 
                 error: 'No token provided',
                 message: 'Please provide an authentication token'
             });
         }
 
-        // Check if it's a Bearer token
-        const parts = authHeader.split(' ');
-        if (parts.length !== 2 || parts[0] !== 'Bearer') {
-            return res.status(401).json({ 
-                error: 'Invalid token format',
-                message: 'Token should be in format: Bearer <token>'
-            });
+        let token = cookieToken;
+        if (!token && authHeader) {
+            // Check if it's a Bearer token
+            const parts = authHeader.split(' ');
+            if (parts.length !== 2 || parts[0] !== 'Bearer') {
+                return res.status(401).json({ 
+                    error: 'Invalid token format',
+                    message: 'Token should be in format: Bearer <token>'
+                });
+            }
+            token = parts[1];
         }
-
-        const token = parts[1];
 
         // Verify the token
         const decoded = jwt.verify(token, constants.JWT_SECRET);

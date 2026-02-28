@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Input from "../components/input.jsx";
 import ButtonComponent from "../components/ButtonComponent.jsx";
+import { buildApiUrl } from "../lib/api.js";
 
 
 function Login() {
@@ -20,6 +21,10 @@ function Login() {
     const handleSubmit = (event) => {
         event.preventDefault();
         setError("");
+    };
+
+    const handleOAuthLogin = (provider) => {
+        window.location.href = buildApiUrl(`/api/auth/${provider}`);
     };
 
     return (
@@ -59,9 +64,6 @@ function Login() {
                             password: form.password
                         }),
                         onSuccess: (data) => {
-                            if (data?.token) {
-                                localStorage.setItem("token", data.token);
-                            }
                             if (data?.user?.role === "admin") {
                                 navigate("/admin");
                             } else {
@@ -74,6 +76,22 @@ function Login() {
                     }}
                     style={{ backgroundColor: "#6A6A6A", padding: "8px 30px" }}
                 />
+                <div className="oauth-buttons">
+                    <button
+                        type="button"
+                        className="oauth-btn google"
+                        onClick={() => handleOAuthLogin("google")}
+                    >
+                        Continuar con Google
+                    </button>
+                    <button
+                        type="button"
+                        className="oauth-btn github"
+                        onClick={() => handleOAuthLogin("github")}
+                    >
+                        Continuar con GitHub
+                    </button>
+                </div>
                 <button
                     className="login-link"
                     type="button"
