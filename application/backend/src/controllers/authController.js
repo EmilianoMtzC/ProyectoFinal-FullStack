@@ -55,24 +55,49 @@ const buildUniqueUsername = async (base) => {
     return `${normalized}_${suffix}`;
 };
 
-const findOrCreateOAuthUser = async ({ email, username, displayName, avatarUrl }) => {
-    if (!email) {
-        throw new Error('OAuth provider did not return an email');
+const findOrCreateOAuthUser = async ({ provider, providerId, email, username, displayName, avatarUrl }) => {
+    if (provider && providerId) {
+        const [usersByProvider] = await pool.query(
+            'SELECT * FROM users WHERE oauth_provider = ? AND oauth_provider_id = ?',
+            [provider, providerId]
+        );
+        if (usersByProvider.length > 0) {
+            return usersByProvider[0];
+        }
     }
 
-    const [usersByEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (usersByEmail.length > 0) {
-        return usersByEmail[0];
+    let resolvedEmail = email;
+    if (resolvedEmail) {
+        const [usersByEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [resolvedEmail]);
+        if (usersByEmail.length > 0) {
+            const user = usersByEmail[0];
+            if (provider && providerId && (!user.oauth_provider || !user.oauth_provider_id)) {
+                await pool.query(
+                    'UPDATE users SET oauth_provider = ?, oauth_provider_id = ? WHERE id = ?',
+                    [provider, providerId, user.id]
+                );
+                const [updatedUsers] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+                return updatedUsers[0];
+            }
+            return user;
+        }
     }
 
-    const safeUsername = await buildUniqueUsername(username || email.split('@')[0]);
+    if (!resolvedEmail) {
+        if (!provider || !providerId) {
+            throw new Error('OAuth provider did not return enough identity information');
+        }
+        resolvedEmail = `${provider}_${providerId}@oauth.local`;
+    }
+
+    const safeUsername = await buildUniqueUsername(username || resolvedEmail.split('@')[0]);
     const passwordHash = await bcrypt.hash(uuidv4(), 10);
     const userId = uuidv4();
-    const role = resolveRoleForEmail(email);
+    const role = resolveRoleForEmail(resolvedEmail);
 
     await pool.query(
-        'INSERT INTO users (id, username, email, password_hash, role, display_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [userId, safeUsername, email, passwordHash, role, displayName || safeUsername, avatarUrl || null]
+        'INSERT INTO users (id, username, email, password_hash, role, display_name, avatar_url, oauth_provider, oauth_provider_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [userId, safeUsername, resolvedEmail, passwordHash, role, displayName || safeUsername, avatarUrl || null, provider || null, providerId || null]
     );
 
     const [createdUsers] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);

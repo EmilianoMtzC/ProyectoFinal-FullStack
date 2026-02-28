@@ -57,7 +57,9 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url VARCHAR(500),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    role VARCHAR(20) NOT NULL DEFAULT 'user'
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    oauth_provider VARCHAR(50) NULL,
+    oauth_provider_id VARCHAR(255) NULL
 );
 
 -- Media types reference
@@ -125,6 +127,7 @@ CREATE TABLE IF NOT EXISTS custom_list_items (
 
 // Index creation statements (run separately to avoid errors)
 const indexStatements = [
+    'CREATE UNIQUE INDEX uniq_users_oauth_provider_id ON users(oauth_provider, oauth_provider_id)',
     'CREATE INDEX idx_media_user ON media_items(user_id)',
     'CREATE INDEX idx_media_type ON media_items(media_type_id)',
     'CREATE INDEX idx_media_status ON media_items(user_id, status)',
@@ -184,6 +187,23 @@ const initDatabase = async () => {
         }
 
         await connection.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role = ''");
+
+
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN oauth_provider VARCHAR(50) NULL");
+        } catch (err) {
+            if (!err.message.includes('Duplicate column')) {
+                console.log('oauth_provider column:', err.message);
+            }
+        }
+
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN oauth_provider_id VARCHAR(255) NULL");
+        } catch (err) {
+            if (!err.message.includes('Duplicate column')) {
+                console.log('oauth_provider_id column:', err.message);
+            }
+        }
 
         // Insert default user if not exists
         await connection.query(`

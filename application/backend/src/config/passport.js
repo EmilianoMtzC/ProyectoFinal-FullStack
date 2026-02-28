@@ -19,9 +19,11 @@ if (googleClientId && googleClientSecret) {
             },
             async (accessToken, refreshToken, profile, done) => {
                 try {
-                    const email = profile.emails && profile.emails[0] && profile.emails[0].value;
+                    const email = (profile.emails && profile.emails[0] && profile.emails[0].value) || (profile._json && profile._json.email) || null;
                     const avatarUrl = profile.photos && profile.photos[0] && profile.photos[0].value;
                     const user = await findOrCreateOAuthUser({
+                        provider: 'google',
+                        providerId: profile.id,
                         email,
                         username: profile.displayName || profile.id,
                         displayName: profile.displayName || profile.username || '',
@@ -47,9 +49,11 @@ if (githubClientId && githubClientSecret) {
             },
             async (accessToken, refreshToken, profile, done) => {
                 try {
-                    const email = profile.emails && profile.emails[0] && profile.emails[0].value;
+                    const email = (profile.emails && profile.emails[0] && profile.emails[0].value) || (profile._json && profile._json.email) || null;
                     const avatarUrl = profile.photos && profile.photos[0] && profile.photos[0].value;
                     const user = await findOrCreateOAuthUser({
+                        provider: 'github',
+                        providerId: profile.id,
                         email,
                         username: profile.username || profile.displayName || profile.id,
                         displayName: profile.displayName || profile.username || '',
