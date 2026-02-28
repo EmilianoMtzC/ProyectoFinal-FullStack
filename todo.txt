@@ -1,4 +1,0 @@
-- login frontend
-- mysql migration
-- casos de prueba con jest o moca
-- perfil de admin

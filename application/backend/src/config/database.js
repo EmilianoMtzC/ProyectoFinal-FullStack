@@ -1,8 +1,4 @@
 const mysql = require('mysql2/promise');
-const path = require('path');
-
-const isRailway = process.env.RAILWAY_ENVIRONMENT === 'true' || process.env.DB_HOST;
-
 let dbConfig = {
     host: process.env.DB_HOST || 'mysql.railway.internal',
     port: parseInt(process.env.DB_PORT) || 3306,

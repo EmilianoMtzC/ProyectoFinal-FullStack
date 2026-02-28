@@ -1,177 +1,231 @@
 # Media Tracker - Gestor de Películas, Series y Juegos
 
-Una aplicación web para gestionar y rastrear el contenido multimedia que has visto, te gustó, o planeas ver.
+Aplicación full stack para registrar contenido multimedia visto y por ver, con autenticación local y OAuth (Google y GitHub), roles de usuario/admin y paneles dedicados.
 
-## 📁 Estructura del Proyecto
+## 🧰 Tecnologías utilizadas
 
-```
-Avance_de_Proyecto_Fullstack/
-├── README.md
-├── LICENSE
-├── .gitignore
-└── application/
-    ├── backend/
-    │   ├── server.js              # Punto de entrada del servidor Express
-    │   ├── package.json           # Dependencias del backend
-    │   └── src/
-    │       ├── config/
-    │       │   ├── constants.js   # Constantes de la aplicación
-    │       │   ├── database.js    # Configuración de SQLite
-    │       │   └── schema.js      # Esquema de la base de datos
-    │       ├── controllers/
-    │       │   └── mediaController.js  # Lógica de medios
-    │       └── routes/
-    │           └── mediaRoutes.js # Rutas de medios (CRUD)
-    │
-    └── frontend/
-        ├── index.html            # Estructura HTML con modales
-        ├── app.js                # Lógica JavaScript (DOM, API)
-        └── style.css             # Estilos CSS
-```
+### Backend
+- Node.js + Express ([`server.js`](application/backend/server.js))
+- MySQL (`mysql2`) para persistencia de usuarios y contenido ([`database.js`](application/backend/src/config/database.js))
+- JWT para autenticación stateless ([`authController.js`](application/backend/src/controllers/authController.js))
+- Cookies seguras con [`cookie-parser`](application/backend/package.json)
+- OAuth 2.0 con Passport:
+  - Google: `passport-google-oauth20`
+  - GitHub: `passport-github2`
+  ([`passport.js`](application/backend/src/config/passport.js))
+- Pruebas unitarias con Jest ([`authController.test.js`](application/backend/tests/authController.test.js))
 
-## 🚀 Inicio Rápido
+### Frontend
+- React 19 + Vite ([`package.json`](application/frontend/package.json))
+- Enrutamiento con React Router DOM ([`App.jsx`](application/frontend/src/App.jsx))
+- Manejo de estado con hooks (`useState`, `useEffect`, `useMemo`) en páginas y componentes ([`DashboardView.jsx`](application/frontend/src/pages/DashboardView.jsx))
+- Estilos con CSS personalizado ([`App.css`](application/frontend/src/styles/App.css))
 
-### Prerrequisitos
-- Node.js (v14 o superior)
-- npm
+---
 
-### Instalación
+## 🏗️ Backend y API (explicación completa)
 
-1. **Instalar dependencias del backend:**
-   ```bash
-   cd application/backend
-   npm install
-   ```
+### 1) Arquitectura general del backend
+El servidor se inicializa en [`server.js`](application/backend/server.js), donde se configura:
+- CORS con lista blanca de orígenes desde [`oauth.js`](application/backend/src/config/oauth.js).
+- Parseo de JSON/formularios y cookies.
+- Inicialización de Passport.
+- Registro de rutas:
+  - `/api/auth` → [`authRoutes.js`](application/backend/src/routes/authRoutes.js)
+  - `/api/media` → [`mediaRoutes.js`](application/backend/src/routes/mediaRoutes.js)
+  - `/api/admin` → [`adminRoutes.js`](application/backend/src/routes/adminRoutes.js)
 
-2. **Iniciar el servidor:**
-   ```bash
-   cd application/backend
-   node server.js
-   ```
+Además expone:
+- `GET /api/health` (estado del servicio)
+- `GET /api` (resumen de endpoints)
 
-3. **Abrir la aplicación:**
-   Navega a `http://localhost:3000` en tu navegador.
+### 2) Autenticación local (registro/login)
+En [`authController.register()`](application/backend/src/controllers/authController.js:112) se valida la entrada, se verifica duplicidad de usuario/email, se hashea contraseña con bcrypt y se genera token JWT.
 
-## 🔧 API Endpoints
+En [`authController.login()`](application/backend/src/controllers/authController.js:173) se valida credenciales, se compara hash de contraseña y se retorna token + perfil.
 
-### Medios
+Ambos flujos llaman internamente a:
+- [`issueTokenAndSetCookie()`](application/backend/src/controllers/authController.js:104)
+- [`setAuthCookie()`](application/backend/src/controllers/authController.js:20)
+
+Esto permite autenticación por:
+- Header `Authorization: Bearer <token>`
+- Cookie `auth_token`
+
+El middleware [`authMiddleware`](application/backend/src/middleware/auth.js) soporta ambos mecanismos.
+
+### 3) API de medios
+Todas las rutas de medios están protegidas con middleware JWT en [`mediaRoutes.js`](application/backend/src/routes/mediaRoutes.js:6):
 
 | Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/api/media` | Obtener todos los medios |
-| GET | `/api/media/:id` | Obtener un medio por ID |
-| POST | `/api/media` | Crear un nuevo medio |
-| PUT | `/api/media/:id` | Actualizar un medio (rating, status) |
-| DELETE | `/api/media/:id` | Eliminar un medio |
+|---|---|---|
+| GET | `/api/media` | Lista ítems del usuario autenticado |
+| GET | `/api/media/:id` | Obtiene un ítem por ID |
+| POST | `/api/media` | Crea nuevo ítem |
+| PUT | `/api/media/:id` | Actualiza estado/rating u otros campos |
+| DELETE | `/api/media/:id` | Elimina ítem |
 
-### Cuerpo de solicitud (POST /api/media):
+### 4) API de administración
+Las rutas de admin requieren 2 capas:
+1. JWT válido (`authMiddleware`)
+2. Rol admin (`requireAdmin`)
 
+Implementado en [`adminRoutes.js`](application/backend/src/routes/adminRoutes.js:7).
+
+Endpoints:
+- `GET /api/admin/users`
+- `DELETE /api/admin/users/:id`
+
+---
+
+## 🔐 Login con Google y GitHub (OAuth 2.0)
+
+### Flujo OAuth implementado
+1. Frontend redirige al backend:
+   - Google: `GET /api/auth/google`
+   - GitHub: `GET /api/auth/github`
+   (disparado desde [`handleOAuthLogin()`](application/frontend/src/pages/Login.jsx:25)).
+
+2. Backend inicia estrategia Passport:
+   - Google/GitHub en [`authRoutes.js`](application/backend/src/routes/authRoutes.js)
+   - Estrategias definidas en [`passport.js`](application/backend/src/config/passport.js)
+
+3. Proveedor OAuth autentica y redirige al callback:
+   - `/api/auth/google/callback`
+   - `/api/auth/github/callback`
+
+4. En callback:
+   - Se ejecuta [`findOrCreateOAuthUser()`](application/backend/src/controllers/authController.js:55)
+   - Se emite JWT por [`issueTokenAndSetCookie()`](application/backend/src/controllers/authController.js:104)
+   - Se redirige al frontend según rol (`/dashboard` o `/admin`) con token en query.
+
+5. Frontend consume query token y lo guarda en `localStorage` en [`useEffect()`](application/frontend/src/pages/DashboardView.jsx:136).
+
+### Variables de entorno clave para OAuth
+Definidas/consumidas en [`oauth.js`](application/backend/src/config/oauth.js) y [`passport.js`](application/backend/src/config/passport.js):
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `BACKEND_URL`
+- `FRONTEND_URL` / `FRONTEND_URL_LOCAL`
+
+Si faltan credenciales OAuth, las rutas responden error controlado (Google/GitHub no configurado).
+
+---
+
+## 🖥️ Frontend (explicación detallada)
+
+### 1) Estructura y navegación
+La app monta React en [`main.jsx`](application/frontend/src/main.jsx) y define rutas en [`App.jsx`](application/frontend/src/App.jsx):
+- `/login`
+- `/register`
+- `/dashboard`
+- `/admin`
+
+Se usa [`BrowserRouter`](application/frontend/src/App.jsx:10), [`Routes`](application/frontend/src/App.jsx:11) y [`Route`](application/frontend/src/App.jsx:12).
+
+### 2) Pantallas principales
+- Login: [`Login.jsx`](application/frontend/src/pages/Login.jsx)
+  - Login por usuario/email + password
+  - Botones OAuth para Google y GitHub
+- Registro: [`Register.jsx`](application/frontend/src/pages/Register.jsx)
+- Dashboard de usuario: [`DashboardView.jsx`](application/frontend/src/pages/DashboardView.jsx)
+- Dashboard admin: [`AdminDashboard.jsx`](application/frontend/src/pages/AdminDashboard.jsx)
+
+### 3) Estado de aplicación y React Context
+En esta versión **no hay un contexto global con React Context API** (no existe [`createContext()`](application/frontend/src/App.jsx:8) ni `useContext` en el código actual).
+
+El estado se maneja de forma local por pantalla/componente usando hooks:
+- Formularios y errores en login/registro con `useState`.
+- Datos de medios, modales, filtros y estado de carga en [`DashboardView.jsx`](application/frontend/src/pages/DashboardView.jsx).
+
+Patrón usado:
+- Estado local por dominio de UI (form, loading, error, modal).
+- Persistencia de sesión en `localStorage` (`token`).
+- Peticiones HTTP centralizadas por URL base con [`buildApiUrl()`](application/frontend/src/lib/api.js:10).
+
+### 4) Componentes reutilizables
+- Botón con comportamiento API configurable: [`ButtonComponent`](application/frontend/src/components/ButtonComponent.jsx)
+- Barra superior y logout: [`Navbar`](application/frontend/src/components/Navbar.jsx)
+- Tabs y tablas del dashboard en componentes desacoplados (`DashboardTabs`, `MediaSection`, `MediaTable`).
+
+### 5) Navegación con router
+Se utiliza:
+- [`useNavigate()`](application/frontend/src/pages/Login.jsx:8) y [`useNavigate()`](application/frontend/src/pages/Register.jsx:7) para transiciones programáticas.
+- Redirección automática raíz → login con [`Navigate`](application/frontend/src/App.jsx:12).
+
+---
+
+## 🧪 Pruebas realizadas (POST, GET y PUT)
+
+### 1) POST - Registro
+Endpoint: `POST /api/auth/register`
+
+Body ejemplo:
 ```json
 {
-  "title": "Nombre del contenido",
-  "media_type": "movie/series/game",
-  "status": "watchlist/seen",
-  "rating": "loved/liked/disliked",
-  "reason": "Razón para ver (opcional)"
+  "username": "nuevo_usuario",
+  "email": "nuevo@email.com",
+  "password": "12345678"
 }
 ```
 
-### Cuerpo de solicitud (PUT /api/media/:id - marcar como visto):
+Resultado esperado:
+- `201 Created`
+- Retorna `token` y objeto `user`.
 
+Cobertura relacionada en pruebas: [`authController.test.js`](application/backend/tests/authController.test.js).
+
+### 2) GET - Perfil autenticado
+Endpoint: `GET /api/auth/me`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Resultado esperado:
+- `200 OK`
+- Retorna `{ user: {...} }`.
+
+Lógica del endpoint: [`authController.getMe()`](application/backend/src/controllers/authController.js:231).
+
+### 3) PUT - Actualización de medio (marcar como visto)
+Endpoint: `PUT /api/media/:id`
+
+Body ejemplo:
 ```json
 {
   "status": "seen",
-  "rating": "loved/liked/disliked"
+  "rating": "liked"
 }
 ```
 
-## 📱 Características
+Resultado esperado:
+- `200 OK`
+- El ítem pasa de watchlist a vistos con calificación.
 
-- **Navegación por categorías**: Películas, Series y Juegos
-- **Gestión de Watchlist**: Agrega contenido que planeas ver con razón opcional
-- **Calificaciones**: Clasifica contenido visto como:
-  - ❤️ Me encantó
-  - 👍 Me gustó
-  - 👎 No me gustó
-- **Marcador de visto**: Modal para calificar contenido del watchlist
-- **Eliminación**: Elimina elementos no deseados con confirmación
+Consumo desde frontend en [`handleMarkSeen()`](application/frontend/src/pages/DashboardView.jsx:247).
 
-## 🎨 Interfaz
+---
 
-### Modales
+## 📸 Capturas de pantalla de la aplicación
 
-1. **Modal de añadir**: Se abre con los botones "Agregar película/serie/juego"
-   - Si es para el watchlist: pide el título y razón
-   - Si es para vistos: pide el título y calificación
+Actualmente el repositorio no contiene archivos de captura (`.png` / `.jpg`).
 
-2. **Modal de marcar como visto**: Se abre con el botón "Visto" en el watchlist
-   - Permite seleccionar calificación antes de mover a vistos
+Se deja esta sección para documentar la evidencia visual final:
 
-### Pestañas
+1. Pantalla de Login
+2. Pantalla de Registro
+3. Dashboard usuario (películas/series/juegos)
+4. Flujo OAuth (redirección y sesión iniciada)
+5. Dashboard de administrador
 
-- **Vistas**: Muestra contenido por calificación (Me encantó, Me gustó, No me gustó)
-- **Por ver**: Muestra contenido del watchlist con razón y botón para marcar como visto
+> Recomendación: guardar capturas en `docs/screenshots/` y enlazarlas aquí.
 
-## 🎯 Uso
-
-1. **Añadir a watchlist**: Haz clic en "Agregar" en la sección "Por ver", ingresa nombre y razón
-2. **Marcar como visto**: Haz clic en "Visto" en un ítem del watchlist, selecciona calificación
-3. **Filtrar por tipo**: Usa los botones de navegación (Películas/Series/Juegos)
-4. **Eliminar**: Haz clic en "Eliminar" en cualquier ítem
-
-## 🗄️ Base de Datos
-
-La aplicación usa **SQLite** con las siguientes tablas:
-
-- **media_items**: Películas, series y juegos
-  - `id`: Identificador único
-  - `title`: Nombre del contenido
-  - `media_type`: movie/series/game
-  - `status`: watchlist/seen
-  - `rating`: loved/liked/disliked (nullable)
-  - `reason`: Razón para ver (opcional, solo watchlist)
-  - `created_at`: Fecha de creación
-  - `updated_at`: Fecha de última modificación
-
-- **media_types**: Tipos de contenido
-  - `id`: Identificador único
-  - `type_name`: movie/series/game
-
-La base de datos se crea automáticamente al iniciar el servidor en:
-`application/backend/src/media_tracker.db`
-
-## 🎨 Personalización
-
-### Textos de botones
-
-En `application/frontend/app.js`, función `renderItem()`:
-
-```javascript
-// Cambiar texto del botón "Visto"
-seenBtn.textContent = 'Visto';
-
-// Cambiar texto del botón eliminar
-deleteBtn.textContent = 'Eliminar';
-```
-
-### Colores de secciones
-
-En `application/frontend/style.css`:
-
-```css
-/* Películas */
-#seen-movies .media-container { border-left-color: #5b7c8d; }
-#watchlist-movies .media-container { border-left-color: #7a8f7a; }
-
-/* Series */
-#seen-series .media-container { border-left-color: #6b7280; }
-#watchlist-series .media-container { border-left-color: #8b9474; }
-
-/* Juegos */
-#seen-games .media-container { border-left-color: #7c6f91; }
-#watchlist-games .media-container { border-left-color: #8a7f6d; }
-```
+---
 
 ## 📝 Licencia
 
-Este proyecto está bajo la licencia MIT.
+Este proyecto está bajo la licencia MIT. Ver [`LICENSE`](LICENSE).
