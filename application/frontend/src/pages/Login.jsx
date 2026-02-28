@@ -85,14 +85,14 @@ function Login() {
                         className="oauth-btn google"
                         onClick={() => handleOAuthLogin("google")}
                     >
-                        Continuar con Google
+                        Login with Google
                     </button>
                     <button
                         type="button"
                         className="oauth-btn github"
                         onClick={() => handleOAuthLogin("github")}
                     >
-                        Continuar con GitHub
+                        Login With GitHub
                     </button>
                 </div>
                 <button
