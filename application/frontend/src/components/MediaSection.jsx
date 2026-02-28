@@ -1,11 +1,11 @@
 import MediaTable from "./MediaTable.jsx";
 
-function MediaSection({ id, title, addLabel, tables, onAddClick, onDelete, onMarkSeen, readOnly }) {
+function MediaSection({ id, title, addLabel, tables, onAddClick, onDelete, onMarkSeen, canAdd, canDelete, canMark }) {
     return (
         <section className="media-section" id={id}>
             <div className="media-section-header">
                 <h2>{title}</h2>
-                {!readOnly && onAddClick ? (
+                {canAdd && onAddClick ? (
                     <button
                         type="button"
                         className="media-add-btn"
@@ -22,7 +22,8 @@ function MediaSection({ id, title, addLabel, tables, onAddClick, onDelete, onMar
                         {...table}
                         onDelete={onDelete}
                         onMarkSeen={onMarkSeen}
-                        readOnly={readOnly}
+                        canDelete={canDelete}
+                        canMark={canMark}
                     />
                 ))}
             </div>

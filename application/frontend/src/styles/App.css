@@ -444,6 +444,14 @@
   gap: 12px;
 }
 
+.admin-selected-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .admin-dashboard-view .dashboard-shell {
   background-color: transparent;
 }
@@ -459,6 +467,26 @@
 .admin-selected-label {
   font-weight: 600;
   color: #dcdcdc;
+}
+
+.admin-danger-btn {
+  border: 1px solid #7a2e2e;
+  background-color: #3a1f1f;
+  color: #f2c3c3;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-danger-btn:hover {
+  border-color: #9a3a3a;
+  background-color: #4a2525;
+}
+
+.admin-danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 720px) {

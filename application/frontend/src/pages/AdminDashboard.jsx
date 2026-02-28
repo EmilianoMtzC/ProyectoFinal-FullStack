@@ -9,6 +9,7 @@ function AdminDashboard() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [deletingUserId, setDeletingUserId] = useState(null);
 
     const loadUsers = async () => {
         setError("");
@@ -40,6 +41,36 @@ function AdminDashboard() {
         loadUsers();
     }, []);
 
+    const handleDeleteUser = async (user) => {
+        if (!user?.id) return;
+        const confirmed = window.confirm(
+            `¿Eliminar al usuario "${user.username}" y todos sus items?`
+        );
+        if (!confirmed) return;
+        setError("");
+        setDeletingUserId(user.id);
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(buildApiUrl(`/api/admin/users/${user.id}`), {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : ""
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data?.error || data?.message || "Error al eliminar usuario");
+            }
+            setSelectedUser(null);
+            await loadUsers();
+        } catch (err) {
+            setError(err?.message || "Error al eliminar usuario");
+        } finally {
+            setDeletingUserId(null);
+        }
+    };
+
     return (
         <div className="dashboard-shell">
             <Navbar />
@@ -70,12 +101,25 @@ function AdminDashboard() {
                 </section>
                 {selectedUser ? (
                     <section className="admin-dashboard-view">
-                        <div className="admin-selected-label">
-                            Dashboard de {selectedUser.username}
+                        <div className="admin-selected-bar">
+                            <div className="admin-selected-label">
+                                Dashboard de {selectedUser.username}
+                            </div>
+                            <button
+                                type="button"
+                                className="admin-danger-btn"
+                                onClick={() => handleDeleteUser(selectedUser)}
+                                disabled={deletingUserId === selectedUser.id}
+                            >
+                                {deletingUserId === selectedUser.id
+                                    ? "Eliminando..."
+                                    : "Eliminar usuario"}
+                            </button>
                         </div>
                         <DashboardView
                             viewUserId={selectedUser.id}
                             readOnly
+                            allowDelete
                             showNavbar={false}
                         />
                     </section>
