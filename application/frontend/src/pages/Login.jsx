@@ -7,7 +7,7 @@ import ButtonComponent from "../components/ButtonComponent.jsx";
 function Login() {
     const navigate = useNavigate();
     const [form, setForm] = useState({
-        email: "",
+        identifier: "",
         password: ""
     });
     const [error, setError] = useState("");
@@ -28,11 +28,11 @@ function Login() {
                 <h1 className="login-title">Login</h1>
                 <Input
                     className="login-input"
-                    type="email"
-                    name="email"
-                    value={form.email}
+                    type="text"
+                    name="identifier"
+                    value={form.identifier}
                     onChange={handleChange}
-                    placeholder="Email"
+                    placeholder="Email o usuario"
                     required
                 />
                 <Input
@@ -55,7 +55,7 @@ function Login() {
                         method: "POST",
                         auth: false,
                         body: () => ({
-                            username: form.email,
+                            username: form.identifier,
                             password: form.password
                         }),
                         onSuccess: (data) => {
