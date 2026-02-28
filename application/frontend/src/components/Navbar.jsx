@@ -25,7 +25,7 @@ function Navbar() {
             zIndex: 1000,
             borderBottom: '1px solid #333'
         }}>
-            <div style={{ fontWeight: 'bold', letterSpacing: '1px' }}>PROYECTO FINAL</div>
+            <div style={{ fontWeight: 'bold', letterSpacing: '1px' }}>MEDIA TRACKER</div>
             
             <div style={{ position: 'relative' }}>
                 <button 

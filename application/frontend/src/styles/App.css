@@ -10,7 +10,7 @@
 .login-card {
   background-color: #333333; 
   padding: 3rem;
-  border-radius: 20px;
+  border-radius: 30px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   width: 100%;
   max-width: 400px;
@@ -21,6 +21,7 @@
 
 .login-title {
   color: white;
+  text-align: center;
   margin-bottom: 1rem;
   font-size: 2rem;
   font-weight: 600;
@@ -36,7 +37,7 @@
 .input-control {
   width: 100%;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: 15px;
   border: 1px solid #444;
   background-color: #1a1a1a;
   color: white;
@@ -46,13 +47,18 @@
 
 .input-control:focus {
   outline: none;
-  border-color: #646cff;
+  border-color: #ffffff;
 }
 
 .input-error {
   color: #ff4d4d;
   font-size: 0.85rem;
   margin-top: 0.25rem;
+}
+
+.login_button:hover {
+  background-color: #ffffff;
+  color: #242424;
 }
 
 .login-link {
